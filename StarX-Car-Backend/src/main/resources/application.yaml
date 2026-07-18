@@ -4,7 +4,7 @@ server:
 spring:
 
   application:
-    name: ride-system
+    name: starx-car
 
   datasource:
     driver-class-name: oracle.jdbc.OracleDriver
@@ -28,7 +28,7 @@ mybatis-plus:
   mapper-locations:
     - classpath*:mapper/**/*.xml
 
-  type-aliases-package: com.xxx.ride.entity
+  type-aliases-package: org.mannerth.starxcar
 
   configuration:
 
@@ -60,7 +60,7 @@ logging:
 
     root: info
 
-    com.xxx.ride: debug
+    org.mannerth.starxcar: debug
 
     org.springframework.security: info
 

@@ -1,0 +1,15 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration
+
+jwt:
+  secret: test-secret-for-context-loads-only
+  expire: 3600
+
+amap:
+  key: test-amap-key
+
+file:
+  upload-path: ./target/uploads

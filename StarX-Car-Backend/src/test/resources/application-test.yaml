@@ -7,6 +7,7 @@ spring:
 jwt:
   secret: test-secret-for-context-loads-only
   expire: 3600
+  refresh-expire: 604800
 
 amap:
   key: test-amap-key

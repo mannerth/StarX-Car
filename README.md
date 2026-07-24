@@ -51,3 +51,50 @@ flowchart LR
 派单时，优先给*优先级*高的k个司机，m秒内无响应，扩大到2k个...
 > 优先级计算可调整、扩展，
 > 初期为 *评分 + 100/路程时间*
+
+
+## 实体
+
+User -> Passenger, Driver, Admin
+Car
+Order
+Comment
+OrderPool
+City
+
+User:
+-   id (primary key)
+-   username (not null, unique)
+-   password (hashed)
+-   gender
+-   email (unique)
+-   type (enum: PASSENGER, DRIVER, ADMIN)
+-   create_time
+-   last_login_time
+
+Passenger:
+-   id (primary key, foreign key to User)
+-   phone_number (not null)
+-   phone_tail (not null, generated from phone_number)
+-   display_phone (not null, generated from phone_number)
+
+Driver:
+-   id (primary key, foreign key to User)
+-   phone_number (not null)
+-   license_number (not null)
+-   rating (default 5.0)
+-   car_id (foreign key to Car)
+-   display_phone (not null, generated from phone_number)
+
+Admin:
+-   id (primary key, foreign key to User)
+
+- Car:
+-   id (primary key)
+-   license_number (not null)
+-   car_number (not null)
+-   car_type (not null)
+-   brand (not null)
+-   color (not null)
+-   create_time
+-   last_update_time

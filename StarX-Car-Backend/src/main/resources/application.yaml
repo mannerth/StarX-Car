@@ -89,6 +89,9 @@ jwt:
 
   refresh-expire: ${JWT_REFRESH_EXPIRE:604800}
 
+admin:
+  default-password: ${ADMIN_DEFAULT_PASSWORD:123456}
+
 amap:
 
   key: ${AMAP_KEY:}

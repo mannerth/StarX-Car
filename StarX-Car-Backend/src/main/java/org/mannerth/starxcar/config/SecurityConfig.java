@@ -22,7 +22,7 @@ import org.mannerth.starxcar.web.RestAuthenticationEntryPoint;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, AdminProperties.class})
 public class SecurityConfig {
 
     @Bean

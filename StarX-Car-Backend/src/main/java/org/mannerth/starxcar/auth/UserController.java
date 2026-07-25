@@ -3,13 +3,18 @@ package org.mannerth.starxcar.auth;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.mannerth.starxcar.auth.request.UserProfileUpdateRequest;
+import org.mannerth.starxcar.auth.request.PasswordChangeRequest;
 import org.mannerth.starxcar.auth.response.UserResponse;
 import org.mannerth.starxcar.security.CurrentUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,9 +28,11 @@ import org.springframework.web.server.ResponseStatusException;
 @SecurityRequirement(name = "bearerAuth")
 public class UserController {
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserController(UserMapper userMapper) {
+    public UserController(UserMapper userMapper, PasswordEncoder passwordEncoder) {
         this.userMapper = userMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @GetMapping
@@ -50,6 +57,18 @@ public class UserController {
         user.setGender(request.gender());
         userMapper.updateById(user);
         return UserResponse.from(requireUser(userId));
+    }
+
+    @PostMapping("/password")
+    @Operation(summary = "修改我的密码", description = "当前登录用户必须先验证原密码；验证成功后使用 BCrypt 保存新密码。")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "密码修改成功"), @ApiResponse(responseCode = "400", description = "新密码参数无效"), @ApiResponse(responseCode = "401", description = "未登录、令牌无效或原密码错误"), @ApiResponse(responseCode = "404", description = "用户不存在")})
+    public void changePassword(@AuthenticationPrincipal String principal, @Valid @RequestBody PasswordChangeRequest request) {
+        User user = requireUser(CurrentUser.id(principal));
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "原密码错误");
+        }
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        userMapper.updateById(user);
     }
 
     private User requireUser(Long userId) {

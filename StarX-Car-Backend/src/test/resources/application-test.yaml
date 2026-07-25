@@ -9,6 +9,9 @@ jwt:
   expire: 3600
   refresh-expire: 604800
 
+admin:
+  default-password: test-default-password
+
 amap:
   key: test-amap-key
 

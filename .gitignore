@@ -1,3 +1,6 @@
 .DS_Store
 
 /local.md
+
+# Local Android release signing credentials. These files must never be committed.
+/android-signing/

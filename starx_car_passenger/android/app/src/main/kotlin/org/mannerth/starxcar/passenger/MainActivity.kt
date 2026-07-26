@@ -1,4 +1,4 @@
-package com.example.starx_car_passenger
+package org.mannerth.starxcar.passenger
 
 import io.flutter.embedding.android.FlutterActivity
 

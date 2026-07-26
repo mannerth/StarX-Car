@@ -1,4 +1,4 @@
-package com.example.starx_car_driver
+package org.mannerth.starxcar.driver
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -9,7 +9,7 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 - Java 21
 - Spring Boot 3.5.16 / Spring Security 6
 - MyBatis-Plus 3.5.7
-- MySQL 8+
+- MySQL 5.6.50
 - JWT（access token + refresh token）
 - BCrypt 密码哈希
 - springdoc OpenAPI / Swagger UI
@@ -57,6 +57,7 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 - 司机可创建并自动绑定车辆，查看、编辑或删除当前绑定车辆。
 - 车辆车牌号唯一；司机只能操作本人绑定的车辆。
 - 乘客/司机号码的尾号和脱敏展示号由 MySQL 触发器维护。
+- 数据库已预留账号实名/状态、司机审核与工作状态、车辆归属地和拆分车牌字段；`driver_car_binding` 保留司机换车的绑定历史，当前 API 仍使用 `driver.car_id` 维护即时绑定关系。
 
 ## API 概览
 

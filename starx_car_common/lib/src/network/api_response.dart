@@ -16,4 +16,14 @@ class ApiResponse<T> {
   final T? data;
 
   bool get isSuccess => code == 0;
+
+  factory ApiResponse.fromJson(
+    Map<String, dynamic> json,
+    T Function(Object? value) dataFromJson,
+  ) => ApiResponse(
+    code: (json['code'] as num).toInt(),
+    message: json['message'] as String? ?? '',
+    traceId: json['traceId'] as String? ?? '',
+    data: json['data'] == null ? null : dataFromJson(json['data']),
+  );
 }

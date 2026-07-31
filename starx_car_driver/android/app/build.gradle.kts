@@ -34,11 +34,8 @@ android {
         versionName = flutter.versionName
     }
 
-    signingConfigs {
-        create("release") {
-            require(keystorePropertiesFile.exists()) {
-                "Missing android/key.properties. Configure the local release signing credentials."
-            }
+    if (keystorePropertiesFile.exists()) {
+        signingConfigs.create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias")
             keyPassword = keystoreProperties.getProperty("keyPassword")
             storeFile = file(keystoreProperties.getProperty("storeFile"))
@@ -48,7 +45,9 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }

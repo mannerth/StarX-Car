@@ -1,31 +1,81 @@
-# starx_car_driver
+# StarX-Car 司机端
 
-StarX-Car 的司机 Android 应用。当前工程使用仓库内的 `starx_car_common` 本地公共包，并为课程项目配置了独立 Android 包名和共享 release 签名。
+`starx_car_driver` 是 StarX-Car 的司机 Android App，依赖本地 `starx_car_common`。当前已完成司机账号、个人资料和当前绑定车辆管理；听单、订单和行程仍未实现。
 
-## 职责边界
+## 当前状态
 
-本项目只实现司机角色的 Android 页面、状态和业务流程，依赖 `starx_car_common` 提供的网络、认证和高德地图基础能力。依赖方向为 `starx_car_driver -> starx_car_common`；本项目不得反向修改或让公共模块依赖司机业务。
+司机登录/注册、加密会话恢复、基础资料、司机资料、密码与车辆创建绑定功能均已对接后端。项目使用 Riverpod 管理会话；`flutter analyze`、`flutter test`、Android debug APK 构建均已通过。
 
-### 本项目负责
+## 已实现功能
 
-- 司机登录、注册、登录态页面跳转、个人资料、驾驶证和车辆维护。
-- 出车/收车、听单、订单列表、接单、拒单、到达乘客点、开始服务和结束服务。
-- 根据当前订单展示乘客上车点、目的地和路线，并调用公共能力跳转高德地图导航。
-- 根据司机出车和订单状态决定是否、以何种频率上报当前位置；处理断网重试和上报结果。
-- 司机订单详情、行程状态、收入和评价相关页面及状态管理。
+### 认证与会话
 
-### 本项目不负责
+- 登录：`POST /api/auth/login`，只接受 `driver` 角色。
+- 注册：`POST /api/auth/drivers/register`，收集用户名、密码、邮箱、性别、手机号和驾驶证号；成功后直接登录。
+- 启动恢复会话，退出时清除安全存储；请求 Bearer Token、401 刷新、重放和错误处理均复用公共包。
 
-- HTTP 鉴权机制、Token 刷新、通用响应解析和安全存储的重复实现。
-- 高德 SDK 初始化、定位权限、POI/逆地理编码、路线规划和外部导航的底层实现。
-- 乘客选点、叫车、支付、乘客订单历史和乘客查看司机位置的业务页面。
-- 后端订单状态机、派单、定价、收入计算、权限判定和任何数据库操作。
+### 个人中心
 
-司机端使用 common 提供的定位能力，但“何时上报、上报哪个订单、间隔多久”是司机业务规则，必须保留在本项目。高德业务坐标统一按 `GCJ-02` 处理，不自行混用 GPS `WGS-84` 坐标。
+- 查看并修改用户名、邮箱、性别、脱敏手机号/手机号和驾驶证号。
+- 修改用户名、邮箱、性别：`PUT /api/users/me`；修改司机手机号与驾驶证号：`PUT /api/drivers/me`。
+- 修改密码：`POST /api/users/me/password`。
+- 所有编辑弹窗为 Stateful 组件，自身持有并在卸载时释放 `TextEditingController`；保存/取消时输入框仍有焦点不会卡死。
 
-## Android 应用标识与签名
+### 当前绑定车辆
 
-- Android package / application ID：`org.mannerth.starxcar.driver`
-- release signing：与乘客端共用本机 `android-signing/starx-car-release.jks` 签名证书。
-- `android/key.properties` 与签名证书均已被 Git 忽略，不能提交、删除或分享。
-- Android debug 与 release 签名的 SHA-1 不同；申请高德 Android Key 时应使用 release 构建证书的 SHA-1 和上述包名。
+- 未绑定时填写车牌号、车辆编号、车型、品牌、颜色，调用 `POST /api/cars` 创建并自动绑定。
+- 已绑定时展示车牌号、品牌、车型，调用 `PUT /api/cars/{carId}` 修改车辆。
+- 未实现解绑、删除车辆与绑定既有车辆的独立页面，尽管后端已有相关接口。
+
+## 工程结构
+
+```text
+lib/
+  main.dart                         ProviderScope 启动入口
+  app.dart                          MaterialApp、主题、登录态分流
+  core/providers.dart               API 地址、SessionStore、ApiClient Provider
+  features/
+    auth/                           Riverpod 认证控制器与登录/注册表单
+    home/
+      driver_repository.dart        用户、司机资料与车辆 API
+      driver_home_page.dart         工作台、资料页、车辆页、编辑弹窗
+```
+
+依赖方向固定为 `starx_car_driver -> starx_car_common`。司机工作流、车辆与位置上报策略不会放入公共包。
+
+## 后端接口
+
+| 方法 | 地址 | 用途 |
+| --- | --- | --- |
+| `POST` | `/api/auth/login` | 司机登录 |
+| `POST` | `/api/auth/drivers/register` | 司机注册并返回令牌 |
+| `GET` / `PUT` | `/api/users/me` | 当前基础资料 |
+| `POST` | `/api/users/me/password` | 修改密码 |
+| `GET` / `PUT` | `/api/drivers/me` | 司机手机号、驾驶证资料 |
+| `GET` | `/api/cars/me` | 获取当前绑定车辆；未绑定为 404 |
+| `POST` | `/api/cars` | 创建并自动绑定车辆 |
+| `PUT` | `/api/cars/{carId}` | 修改当前绑定车辆 |
+
+## Android 配置、运行与验证
+
+- application ID：`org.mannerth.starxcar.driver`。
+- 默认后端地址：`http://10.0.2.2:8080/api`；可通过 `--dart-define=API_BASE_URL=...` 覆盖。
+- 本地开发允许 HTTP，生产必须改用 HTTPS。
+- 未配置 `android/key.properties` 时仍可构建 debug APK；配置本机 release 签名后 release 构建会自动使用它。
+- 签名文件和 `key.properties` 均不可提交、删除或分享。
+
+```powershell
+cd starx_car_driver
+fvm flutter pub get
+fvm flutter analyze
+fvm flutter test
+fvm flutter run
+fvm flutter build apk --debug
+```
+
+## 尚未实现
+
+- 出车/收车、听单、待接订单列表、接单/拒单。
+- 到达、开始服务、结束服务等行程状态。
+- 地图、接驾/送驾导航、按订单状态的位置上报与断网重试。
+- 订单历史、收入、评价。

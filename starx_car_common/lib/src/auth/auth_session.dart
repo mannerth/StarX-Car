@@ -22,4 +22,18 @@ class AuthSession {
 
   /// Backend role value, such as `passenger` or `driver`.
   final String userType;
+
+  Map<String, dynamic> toJson() => {
+    'accessToken': accessToken,
+    'refreshToken': refreshToken,
+    'userId': userId,
+    'userType': userType,
+  };
+
+  factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
+    accessToken: json['accessToken'] as String,
+    refreshToken: json['refreshToken'] as String,
+    userId: (json['userId'] as num).toInt(),
+    userType: json['userType'] as String,
+  );
 }

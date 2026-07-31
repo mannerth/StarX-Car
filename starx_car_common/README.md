@@ -1,20 +1,36 @@
 # StarX-Car Flutter 公共包
 
-`starx_car_common` 是 StarX-Car 数据库课程设计中乘客 Android App 与司机 Android App 共用的本地 Flutter package。它不发布到 pub.dev，也不包含任一角色的页面或订单流程。
+`starx_car_common` 是 StarX-Car 乘客端与司机端共用的本地 Flutter package，不发布至 pub.dev。它提供跨角色基础设施与基础模型，绝不包含角色页面、路由、状态管理或订单业务。
 
-两个 App 均使用 FVM Flutter `3.44.8`；本包的 Flutter SDK 约束与其保持一致。
+当前使用 FVM Flutter `3.44.8`、Dart `3.12.2`；两个 App 以 path 依赖引用本包。
 
-## 当前能力
+## 当前状态
 
-- 定义与后端统一响应结构对应的 `ApiResponse<T>`。
-- 定义跨端登录会话模型 `AuthSession`，用于后续统一 Token 存储与刷新逻辑。
-- 定义地图基础模型：`GeoPoint`、`CoordinateSystem`、`Place`。
-- 明确高德地图业务坐标使用 `GCJ-02`，避免与设备 GPS 的 `WGS-84` 坐标混用造成地图点位偏移。
-- 提供包级测试，校验公共响应和地图坐标模型的基础行为。
+公共认证与网络基础设施已经可供两个 Android App 使用；地图部分目前只有坐标和地点模型，尚未接入高德 SDK。包级静态检查和单元测试均已通过。
+
+## 已实现能力
+
+### 会话与基础用户模型
+
+- `AuthSession`：保存 access token、refresh token、当前用户 ID 与角色；支持 JSON 序列化，供安全存储恢复会话。
+- `SessionStore`：用 `flutter_secure_storage` 加密保存、读取与清除会话。两个 App 启动时均通过它恢复登录态，退出时清除本地令牌。
+- `UserProfile`：角色无关的用户基础资料模型，包含 ID、用户名、邮箱、性别与角色。
+
+### HTTP 与令牌刷新
+
+- `ApiClient` 基于 Dio，统一使用后端 `/api` 响应信封，成功时返回 `data` 字段。
+- 每个请求自动读取安全会话并附加 `Authorization: Bearer <accessToken>`。
+- 收到业务请求的 `401` 时，使用 refresh token 请求 `/auth/refresh`；同一时刻的多个 `401` 合并为一次刷新请求，刷新成功后自动重放原请求。
+- 刷新失败或不存在会话时清除本地会话；调用方可据此返回登录页。
+- `ApiException` 只保留可展示的服务端消息、HTTP 状态和 trace ID，不暴露底层异常详情。
+
+### 通用模型
+
+- `ApiResponse<T>`：对应后端 `{ code, message, traceId, data }` 信封。
+- `GeoPoint`、`CoordinateSystem`、`Place`：为后续地图与地点选择提供基础类型。
+- 高德业务坐标统一按 `GCJ-02` 使用；设备 GPS 的 `WGS-84` 必须在地图基础层明确转换或标注，业务端不得混用。
 
 ## 职责边界
-
-本包是乘客端、司机端共同依赖的“基础设施与跨角色能力层”，不是通用业务层。依赖方向只能是：
 
 ```text
 starx_car_passenger ─┐
@@ -22,34 +38,17 @@ starx_car_passenger ─┐
 starx_car_driver ────┘
 ```
 
-本包不得导入或依赖任一 App。
+可放入：网络、会话、令牌刷新、安全存储、通用错误、地图底层能力与跨角色模型。
 
-### 应放入本包的能力
+不得放入：乘客/司机页面与 Riverpod 状态、完整角色 Repository、叫车/接单/支付/评价/收入流程、订单状态机、派单、定价、数据库访问，以及任何高德 Key 或签名资料。
 
-- 网络基础设施：HTTP 客户端、后端统一响应解析、Bearer Token 附加、401 刷新令牌、通用网络异常。
-- 认证基础能力：会话、Token 安全存储、登录态恢复、登出清理、当前用户基础资料。
-- 高德 Android 地图能力：地图展示、定位权限、当前位置、POI 搜索、地理/逆地理编码、路线规划和跳转高德地图导航。
-- 与角色无关的模型：坐标、地点、分页、用户基础信息和统一响应。
+## 依赖与 Android 兼容性
 
-### 坐标规范
+- `dio`：HTTP 传输。
+- `flutter_secure_storage 9.2.4`：Android Keystore 安全存储。
+- `path_provider_android 2.2.22`：在包与两个 App 中固定该版本，避免新版本引入的 `jni` Android Gradle 插件与当前 Flutter 3.44 Gradle 模板冲突。
 
-高德地图业务数据统一使用 `GCJ-02`。设备原始 GPS 位置可能是 `WGS-84`，必须在地图基础能力中明确转换或标注；业务端只使用 `GeoPoint`，不得自行混用坐标系，以免出现地图点位偏移。
-
-### 不得放入本包的内容
-
-- 乘客或司机的页面、路由、状态管理和完整业务 Repository。
-- 叫车、取消订单、接单、拒单、到达、开始/结束服务、支付、评价、收入等角色业务流程。
-- 订单状态机、派单、定价、司机调度、后端数据库操作和管理员业务。
-- 高德 Key、Android Manifest 中的敏感配置、JKS/Keystore 及签名密码。
-- 为本次 Android 课程设计无实际需要的多地图供应商适配、复杂依赖注入或多 package 工作区工具。
-
-### 实时位置与订单模型
-
-第一阶段可使用 HTTP 定时上报与轮询。若后续采用 WebSocket，本包只负责连接、鉴权、重连、心跳和通用事件信封；司机何时上报位置、乘客订阅哪个订单/司机，仍属于各自 App。订单仅在字段确实跨角色一致时才放入本包；默认将乘客订单详情和司机订单详情保留在各自业务端。
-
-## 在两个 App 中使用
-
-在乘客端或司机端的 `pubspec.yaml` 增加本地依赖：
+## 使用与验证
 
 ```yaml
 dependencies:
@@ -57,30 +56,15 @@ dependencies:
     path: ../starx_car_common
 ```
 
-随后在对应 App 目录运行：
-
-```bash
-fvm flutter pub get
-```
-
-引用公共模型：
-
-```dart
-import 'package:starx_car_common/starx_car_common.dart';
-
-const pickup = GeoPoint(latitude: 31.2304, longitude: 121.4737);
-```
-
-## 后续建设顺序
-
-1. 完善公共 HTTP、JWT 刷新和 Token 安全存储。
-2. 完成高德 Android 地图、定位、POI、路线和外部导航的最小 PoC。
-3. 由两个 App 分别实现乘客叫车和司机接单业务；不要将角色流程回流到本包。
-
-## 验证命令
-
-```bash
+```powershell
 cd starx_car_common
+fvm flutter pub get
 fvm flutter analyze
 fvm flutter test
 ```
+
+## 尚未实现
+
+- 高德 Android 地图、定位权限、POI、逆地理编码、路线规划与外部导航。
+- WebSocket 的连接、重连、心跳和通用事件信封。
+- 分页及更多跨角色展示模型。

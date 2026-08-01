@@ -56,6 +56,20 @@ class ApiClient {
       _request(() => _dio.post<dynamic>(path, data: data));
   Future<dynamic> put(String path, {Object? data}) =>
       _request(() => _dio.put<dynamic>(path, data: data));
+  Future<dynamic> putMultipart(
+    String path, {
+    required Map<String, String> fields,
+    List<int>? fileBytes,
+    String? fileName,
+    String fileField = 'avatar',
+  }) {
+    final data = FormData.fromMap({
+      ...fields,
+      if (fileBytes != null)
+        fileField: MultipartFile.fromBytes(fileBytes, filename: fileName ?? 'upload'),
+    });
+    return _request(() => _dio.put<dynamic>(path, data: data));
+  }
   Future<dynamic> delete(String path) =>
       _request(() => _dio.delete<dynamic>(path));
 

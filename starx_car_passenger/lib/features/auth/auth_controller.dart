@@ -28,6 +28,7 @@ class PassengerAuthController extends AsyncNotifier<AuthSession?> {
     required String email,
     required String gender,
     required String phoneNumber,
+    required String realName,
   }) {
     return _authenticate('/auth/passengers/register', {
       'username': username,
@@ -35,6 +36,7 @@ class PassengerAuthController extends AsyncNotifier<AuthSession?> {
       'email': email,
       'gender': gender,
       'phoneNumber': phoneNumber,
+      'realName': realName,
     });
   }
 

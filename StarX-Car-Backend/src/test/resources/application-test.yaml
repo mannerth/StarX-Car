@@ -17,3 +17,8 @@ amap:
 
 file:
   upload-path: ./target/uploads
+
+image-service:
+  base-url: http://127.0.0.1:1/api/v1
+  email: test@example.com
+  password: test-password

@@ -1,5 +1,6 @@
 export type UserType = 'admin' | 'passenger' | 'driver'
 export type Gender = 'male' | 'female'
+export type UserStatus = 'active' | 'disabled' | 'cancelled'
 
 export interface User {
   id: number
@@ -7,8 +8,12 @@ export interface User {
   email: string | null
   gender: Gender | null
   type: UserType
+  realName: string | null
+  avatarUrl: string | null
+  status: UserStatus
   createTime: string | null
   lastLoginTime: string | null
+  updateTime: string | null
 }
 
 export interface UserPage {

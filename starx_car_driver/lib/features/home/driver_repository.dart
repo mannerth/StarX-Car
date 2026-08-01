@@ -1,4 +1,5 @@
 import 'package:starx_car_common/starx_car_common.dart';
+import 'package:image_picker/image_picker.dart';
 
 class DriverRepository {
   const DriverRepository(this._api);
@@ -16,9 +17,23 @@ class DriverRepository {
     }
   }
 
-  Future<void> updateUser(Map<String, Object> data) async =>
+  Future<void> updateUser(Map<String, Object?> data) async =>
       _api.put('/users/me', data: data);
-  Future<void> updateDriver(Map<String, Object> data) async =>
+  Future<void> updateAvatar(UserProfile user, XFile avatar) async {
+    await _api.putMultipart(
+      '/users/me',
+      fields: {
+        'username': user.username,
+        'email': user.email ?? '',
+        'gender': user.gender,
+        'realName': user.realName ?? '',
+        'avatarUrl': '',
+      },
+      fileBytes: await avatar.readAsBytes(),
+      fileName: avatar.name,
+    );
+  }
+  Future<void> updateDriver(Map<String, Object?> data) async =>
       _api.put('/drivers/me', data: data);
   Future<void> changePassword(String current, String fresh) async => _api.post(
     '/users/me/password',

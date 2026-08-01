@@ -96,6 +96,9 @@ amap:
 
   key: ${AMAP_KEY:}
 
-file:
 
-  upload-path: ${UPLOAD_PATH:}
+image-service:
+  base-url: ${IMAGE_SERVICE_BASE_URL:https://image.foofish.work/api/v1}
+  email: ${IMAGE_SERVICE_EMAIL:}
+  password: ${IMAGE_SERVICE_PASSWORD:}
+  strategy-id: ${IMAGE_SERVICE_STRATEGY_ID:}

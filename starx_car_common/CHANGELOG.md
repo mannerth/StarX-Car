@@ -1,5 +1,9 @@
 ## Unreleased
 
+- 新增 `ApiClient.putMultipart`，为角色端的资料表单提供带鉴权、统一响应解析及 401 刷新的图片文件上传传输能力；不包含任何角色业务流程。
+
+- 扩展共享 `UserProfile`，解析真实姓名、头像地址和账号状态字段。
+
 - Rewrite README to document the implemented session, HTTP, token-refresh, secure-storage and model capabilities, compatibility pinning, boundaries, validation and pending map work.
 
 - Fix the Dio request-header constant used by the shared API client so all three Flutter projects compile.

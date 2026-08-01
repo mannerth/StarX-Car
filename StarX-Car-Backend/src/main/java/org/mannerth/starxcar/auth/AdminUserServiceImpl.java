@@ -9,6 +9,9 @@ import org.mannerth.starxcar.auth.response.UserResponse;
 import org.mannerth.starxcar.constant.UserType;
 import org.mannerth.starxcar.config.AdminProperties;
 import org.mannerth.starxcar.driver.DriverMapper;
+import org.mannerth.starxcar.driver.DriverCarBinding;
+import org.mannerth.starxcar.driver.DriverCarBindingMapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.mannerth.starxcar.passenger.PassengerMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,14 +27,17 @@ public class AdminUserServiceImpl implements AdminUserService {
     private final UserMapper userMapper;
     private final PassengerMapper passengerMapper;
     private final DriverMapper driverMapper;
+    private final DriverCarBindingMapper driverCarBindingMapper;
     private final PasswordEncoder passwordEncoder;
     private final AdminProperties adminProperties;
 
     public AdminUserServiceImpl(UserMapper userMapper, PassengerMapper passengerMapper, DriverMapper driverMapper,
+                                DriverCarBindingMapper driverCarBindingMapper,
                                 PasswordEncoder passwordEncoder, AdminProperties adminProperties) {
         this.userMapper = userMapper;
         this.passengerMapper = passengerMapper;
         this.driverMapper = driverMapper;
+        this.driverCarBindingMapper = driverCarBindingMapper;
         this.passwordEncoder = passwordEncoder;
         this.adminProperties = adminProperties;
     }
@@ -68,6 +74,11 @@ public class AdminUserServiceImpl implements AdminUserService {
         user.setUsername(request.username());
         user.setEmail(request.email());
         user.setGender(request.gender());
+        user.setRealName(request.realName());
+        user.setAvatarUrl(request.avatarUrl());
+        if (request.status() != null) {
+            user.setStatus(request.status());
+        }
         userMapper.updateById(user);
         return UserResponse.from(requireUser(userId));
     }
@@ -92,6 +103,8 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (user.getType() == UserType.passenger) {
             passengerMapper.deleteById(userId);
         } else if (user.getType() == UserType.driver) {
+            driverCarBindingMapper.delete(Wrappers.<DriverCarBinding>lambdaQuery()
+                    .eq(DriverCarBinding::getDriverId, userId));
             driverMapper.deleteById(userId);
         }
         userMapper.deleteById(userId);

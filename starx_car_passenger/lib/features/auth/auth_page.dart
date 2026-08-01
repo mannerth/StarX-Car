@@ -17,6 +17,7 @@ class _PassengerAuthPageState extends ConsumerState<PassengerAuthPage> {
   final _password = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
+  final _realName = TextEditingController();
   bool _isRegistering = false;
   String _gender = 'male';
 
@@ -26,6 +27,7 @@ class _PassengerAuthPageState extends ConsumerState<PassengerAuthPage> {
     _password.dispose();
     _email.dispose();
     _phone.dispose();
+    _realName.dispose();
     super.dispose();
   }
 
@@ -40,6 +42,7 @@ class _PassengerAuthPageState extends ConsumerState<PassengerAuthPage> {
           email: _email.text.trim(),
           gender: _gender,
           phoneNumber: _phone.text.trim(),
+          realName: _realName.text.trim(),
         );
       } else {
         await controller.login(
@@ -94,6 +97,7 @@ class _PassengerAuthPageState extends ConsumerState<PassengerAuthPage> {
                     ),
                     if (_isRegistering) ...[
                       _textField(_email, '邮箱', email: true),
+                      _textField(_realName, '真实姓名'),
                       _textField(_phone, '手机号', phone: true),
                       DropdownButtonFormField<String>(
                         initialValue: _gender,

@@ -23,7 +23,11 @@ public class User {
     private String email;
     private UserType type;
     private GenderEnum gender;
+    private String realName;
+    private String avatarUrl;
+    private String status;
 
     private LocalDateTime createTime;
     private LocalDateTime lastLoginTime;
+    private LocalDateTime updateTime;
 }

@@ -1,5 +1,5 @@
 import { request } from '@/api/http'
-import type { Gender, User, UserPage, UserType } from '@/types/api'
+import type { Gender, User, UserPage, UserStatus, UserType } from '@/types/api'
 
 export function fetchUsers(params: { page: number; size: number; keyword?: string; type?: UserType }) {
   const query = new URLSearchParams({ page: String(params.page), size: String(params.size) })
@@ -8,7 +8,7 @@ export function fetchUsers(params: { page: number; size: number; keyword?: strin
   return request<UserPage>(`/admin/users?${query.toString()}`)
 }
 
-export function updateUser(id: number, data: { username: string; email: string | null; gender: Gender }) {
+export function updateUser(id: number, data: { username: string; email: string | null; gender: Gender; realName: string | null; avatarUrl: string | null; status?: UserStatus }) {
   return request<User>(`/admin/users/${id}`, { method: 'PUT', data })
 }
 

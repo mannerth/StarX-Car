@@ -16,11 +16,19 @@ class _DriverAuthPageState extends ConsumerState<DriverAuthPage> {
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _license = TextEditingController();
+  final _realName = TextEditingController();
   bool _registering = false;
   String _gender = 'male';
   @override
   void dispose() {
-    for (final controller in [_username, _password, _email, _phone, _license]) {
+    for (final controller in [
+      _username,
+      _password,
+      _email,
+      _phone,
+      _license,
+      _realName,
+    ]) {
       controller.dispose();
     }
     super.dispose();
@@ -38,6 +46,7 @@ class _DriverAuthPageState extends ConsumerState<DriverAuthPage> {
           'gender': _gender,
           'phoneNumber': _phone.text.trim(),
           'licenseNumber': _license.text.trim(),
+          'realName': _realName.text.trim(),
         });
       } else {
         await auth.login(_username.text.trim(), _password.text);
@@ -82,6 +91,7 @@ class _DriverAuthPageState extends ConsumerState<DriverAuthPage> {
                     _field(_password, '密码', secret: true, min: 6),
                     if (_registering) ...[
                       _field(_email, '邮箱', email: true),
+                      _field(_realName, '真实姓名'),
                       _field(_phone, '手机号', phone: true),
                       _field(_license, '驾驶证号'),
                       DropdownButtonFormField<String>(

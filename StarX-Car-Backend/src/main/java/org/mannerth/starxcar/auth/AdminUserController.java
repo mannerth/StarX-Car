@@ -57,7 +57,7 @@ public class AdminUserController {
     }
 
     @PutMapping("/{userId}")
-    @Operation(summary = "编辑用户资料", description = "管理员编辑用户名、邮箱和性别；用户名和非空邮箱必须唯一，用户类型及密码不在此接口修改。")
+    @Operation(summary = "编辑用户资料", description = "管理员编辑用户名、邮箱、性别、实名资料、头像和账号状态；用户名和非空邮箱必须唯一，用户类型及密码不在此接口修改。")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "更新成功"), @ApiResponse(responseCode = "400", description = "参数无效"), @ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @ApiResponse(responseCode = "403", description = "非管理员"), @ApiResponse(responseCode = "404", description = "用户不存在"), @ApiResponse(responseCode = "409", description = "用户名或邮箱已存在")})
     public UserResponse update(@PathVariable Long userId, @Valid @RequestBody AdminUserUpdateRequest request) {
         return adminUserService.update(userId, request);

@@ -13,12 +13,14 @@
 ### 会话与基础用户模型
 
 - `AuthSession`：保存 access token、refresh token、当前用户 ID 与角色；支持 JSON 序列化，供安全存储恢复会话。
+- `UserProfile`：解析用户名、真实姓名、头像地址、账号状态、邮箱、性别与角色，供两个角色端展示基础资料。
 - `SessionStore`：用 `flutter_secure_storage` 加密保存、读取与清除会话。两个 App 启动时均通过它恢复登录态，退出时清除本地令牌。
 - `UserProfile`：角色无关的用户基础资料模型，包含 ID、用户名、邮箱、性别与角色。
 
 ### HTTP 与令牌刷新
 
 - `ApiClient` 基于 Dio，统一使用后端 `/api` 响应信封，成功时返回 `data` 字段。
+- `ApiClient.putMultipart`：统一发送带 Bearer Token 的 Multipart 请求；乘客端和司机端用它随个人资料提交头像文件，不直接访问图床服务。
 - 每个请求自动读取安全会话并附加 `Authorization: Bearer <accessToken>`。
 - 收到业务请求的 `401` 时，使用 refresh token 请求 `/auth/refresh`；同一时刻的多个 `401` 合并为一次刷新请求，刷新成功后自动重放原请求。
 - 刷新失败或不存在会话时清除本地会话；调用方可据此返回登录页。

@@ -1,4 +1,5 @@
 import 'package:starx_car_common/starx_car_common.dart';
+import 'package:image_picker/image_picker.dart';
 
 class PassengerRepository {
   const PassengerRepository(this._apiClient);
@@ -19,13 +20,23 @@ class PassengerRepository {
     required String username,
     required String email,
     required String gender,
-  }) async => UserProfile.fromJson(
-    await _apiClient.put(
+    required String realName,
+    XFile? avatar,
+  }) async {
+    final data = await _apiClient.putMultipart(
           '/users/me',
-          data: {'username': username, 'email': email, 'gender': gender},
-        )
-        as Map<String, dynamic>,
-  );
+          fields: {
+            'username': username,
+            'email': email,
+            'gender': gender,
+            'realName': realName,
+            'avatarUrl': '',
+          },
+          fileBytes: avatar == null ? null : await avatar.readAsBytes(),
+          fileName: avatar?.name,
+        ) as Map<String, dynamic>;
+    return UserProfile.fromJson(data);
+  }
 
   Future<void> changePassword({
     required String currentPassword,

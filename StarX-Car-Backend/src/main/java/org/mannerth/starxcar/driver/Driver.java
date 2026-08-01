@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Data
 @TableName("driver")
@@ -17,4 +18,8 @@ public class Driver {
     private BigDecimal rating;
     private Long carId;
     private String displayPhone;
+    private String idCardNo;
+    private LocalDate licenseExpireDate;
+    private String approvalStatus;
+    private String workStatus;
 }

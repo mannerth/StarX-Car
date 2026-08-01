@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:starx_car_common/starx_car_common.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
 import 'driver_repository.dart';
@@ -61,11 +62,28 @@ class DriverProfileTab extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(u.username, style: Theme.of(context).textTheme.headlineSmall),
+        Center(
+          child: CircleAvatar(
+            radius: 34,
+            backgroundImage: u.avatarUrl?.isNotEmpty == true
+                ? NetworkImage(u.avatarUrl!)
+                : null,
+            child: Text((u.realName ?? u.username).substring(0, 1)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          u.realName ?? u.username,
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
         Card(
           child: Column(
             children: [
               ListTile(title: const Text('用户名'), subtitle: Text(u.username)),
+              ListTile(
+                title: const Text('真实姓名'),
+                subtitle: Text(u.realName ?? '未填写'),
+              ),
               ListTile(
                 title: const Text('邮箱'),
                 subtitle: Text(u.email ?? '未填写'),
@@ -84,12 +102,32 @@ class DriverProfileTab extends ConsumerWidget {
                 title: const Text('驾驶证号'),
                 subtitle: Text(d['licenseNumber'] as String),
               ),
+              ListTile(
+                title: const Text('身份证号'),
+                subtitle: Text(d['idCardNo'] as String? ?? '未填写'),
+              ),
+              ListTile(
+                title: const Text('驾驶证有效期'),
+                subtitle: Text(d['licenseExpireDate'] as String? ?? '未填写'),
+              ),
+              ListTile(
+                title: const Text('审核状态'),
+                subtitle: Text(d['approvalStatus'] as String? ?? 'pending'),
+              ),
+              ListTile(
+                title: const Text('工作状态'),
+                subtitle: Text(d['workStatus'] as String? ?? 'offline'),
+              ),
             ],
           ),
         ),
         FilledButton.tonal(
           onPressed: () => _editBaseProfile(context, ref, u),
           child: const Text('修改基础资料'),
+        ),
+        FilledButton.tonal(
+          onPressed: () => _updateAvatar(context, ref, u),
+          child: const Text('修改头像'),
         ),
         FilledButton.tonal(
           onPressed: () => _editDriver(context, ref, d),
@@ -111,20 +149,48 @@ class DriverProfileTab extends ConsumerWidget {
     await _showDriverFormDialog(
       context,
       title: '修改基础资料',
-      initialValues: [user.username, user.email ?? '', user.gender],
-      labels: const ['用户名', '邮箱', '性别（male 或 female）'],
+      initialValues: [
+        user.username,
+        user.email ?? '',
+        user.gender,
+        user.realName ?? '',
+      ],
+      labels: const ['用户名', '邮箱', '性别', '真实姓名'],
+      genderIndex: 2,
       onSave: (values) async {
-        if (values[2] != 'male' && values[2] != 'female') {
-          throw const ApiException('性别只能填写 male 或 female。');
-        }
         await ref.read(driverRepositoryProvider).updateUser({
           'username': values[0].trim(),
           'email': values[1].trim(),
           'gender': values[2],
+          'realName': values[3].trim(),
+          'avatarUrl': user.avatarUrl,
         });
         ref.invalidate(userProfileProvider);
       },
     );
+  }
+
+  Future<void> _updateAvatar(
+    BuildContext context,
+    WidgetRef ref,
+    UserProfile user,
+  ) async {
+    final avatar = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1024,
+    );
+    if (avatar == null || !context.mounted) return;
+    try {
+      await ref.read(driverRepositoryProvider).updateAvatar(user, avatar);
+      ref.invalidate(userProfileProvider);
+    } on ApiException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    }
   }
 
   Future<void> _editDriver(
@@ -138,12 +204,19 @@ class DriverProfileTab extends ConsumerWidget {
       initialValues: [
         driver['phoneNumber'] as String,
         driver['licenseNumber'] as String,
+        driver['idCardNo'] as String? ?? '',
+        driver['licenseExpireDate'] as String? ?? '',
       ],
-      labels: const ['手机号', '驾驶证号'],
+      labels: const ['手机号', '驾驶证号', '身份证号（可选）', '驾驶证有效期（可选）'],
+      dateIndex: 3,
       onSave: (values) async {
         await ref.read(driverRepositoryProvider).updateDriver({
           'phoneNumber': values[0].trim(),
           'licenseNumber': values[1].trim(),
+          'idCardNo': values[2].trim().isEmpty ? null : values[2].trim(),
+          'licenseExpireDate': values[3].trim().isEmpty
+              ? null
+              : values[3].trim(),
         });
         ref.invalidate(driverProfileProvider);
       },
@@ -186,7 +259,19 @@ class CarTab extends ConsumerWidget {
               children: [
                 ListTile(
                   title: const Text('车牌号'),
-                  subtitle: Text(value['licenseNumber'] as String),
+                  subtitle: Text(
+                    '${value['plateProvince']}${value['plateLetter']}${value['plateSerial']}',
+                  ),
+                ),
+                ListTile(
+                  title: const Text('登记归属地'),
+                  subtitle: Text(
+                    value['registrationPlace'] as String? ?? '未填写',
+                  ),
+                ),
+                ListTile(
+                  title: const Text('核定载客数'),
+                  subtitle: Text('${value['seatCount'] ?? '—'} 人'),
                 ),
                 ListTile(
                   title: const Text('品牌'),
@@ -219,20 +304,62 @@ class CarTab extends ConsumerWidget {
       title: car == null ? '创建并绑定车辆' : '修改绑定车辆',
       initialValues: [
         car?['licenseNumber'] as String? ?? '',
-        car?['carNumber'] as String? ?? '',
+        car?['plateProvince'] as String? ?? '',
+        car?['plateLetter'] as String? ?? '',
+        car?['plateSerial'] as String? ?? '',
+        car?['registrationPlace'] as String? ?? '',
+        '${car?['seatCount'] ?? 5}',
+        '${car?['vehicleYear'] ?? ''}',
         car?['carType'] as String? ?? '',
         car?['brand'] as String? ?? '',
         car?['color'] as String? ?? '',
       ],
-      labels: const ['车牌号', '车辆编号', '车型', '品牌', '颜色'],
+      labels: const [
+        '行驶证号',
+        '车牌省份简称',
+        '车牌字母',
+        '车牌号码部分',
+        '登记归属地',
+        '核定载客数',
+        '出厂年份（可选）',
+        '车型',
+        '品牌',
+        '颜色',
+      ],
+      yearIndex: 6,
       onSave: (values) async {
-        await ref.read(driverRepositoryProvider).saveCar({
+        final seatCount = int.tryParse(values[5].trim());
+        final vehicleYear = values[6].trim().isEmpty
+            ? null
+            : int.tryParse(values[6].trim());
+        if (seatCount == null || seatCount < 1 || seatCount > 9) {
+          throw const ApiException('核定载客数应为 1 到 9。');
+        }
+        if (values[1].trim().length != 1 ||
+            !RegExp(r'^[A-Za-z]$').hasMatch(values[2].trim()) ||
+            values[3].trim().isEmpty) {
+          throw const ApiException('请填写规范的拆分车牌信息。');
+        }
+        if (values[6].trim().isNotEmpty && vehicleYear == null) {
+          throw const ApiException('出厂年份必须是数字。');
+        }
+        final carData = <String, Object>{
           'licenseNumber': values[0].trim(),
-          'carNumber': values[1].trim(),
-          'carType': values[2].trim(),
-          'brand': values[3].trim(),
-          'color': values[4].trim(),
-        }, (car?['id'] as num?)?.toInt());
+          'plateProvince': values[1].trim(),
+          'plateLetter': values[2].trim(),
+          'plateSerial': values[3].trim(),
+          'registrationPlace': values[4].trim(),
+          'seatCount': seatCount,
+          'carType': values[7].trim(),
+          'brand': values[8].trim(),
+          'color': values[9].trim(),
+        };
+        if (vehicleYear != null) {
+          carData['vehicleYear'] = vehicleYear;
+        }
+        await ref
+            .read(driverRepositoryProvider)
+            .saveCar(carData, (car?['id'] as num?)?.toInt());
         ref.invalidate(carProvider);
       },
     );
@@ -246,6 +373,9 @@ Future<void> _showDriverFormDialog(
   required List<String> labels,
   required Future<void> Function(List<String>) onSave,
   bool obscureText = false,
+  int? genderIndex,
+  int? dateIndex,
+  int? yearIndex,
 }) => showDialog<void>(
   context: context,
   builder: (_) => _DriverFormDialog(
@@ -254,6 +384,9 @@ Future<void> _showDriverFormDialog(
     labels: labels,
     onSave: onSave,
     obscureText: obscureText,
+    genderIndex: genderIndex,
+    dateIndex: dateIndex,
+    yearIndex: yearIndex,
   ),
 );
 
@@ -264,12 +397,18 @@ class _DriverFormDialog extends StatefulWidget {
     required this.labels,
     required this.onSave,
     required this.obscureText,
+    required this.genderIndex,
+    required this.dateIndex,
+    required this.yearIndex,
   });
   final String title;
   final List<String> initialValues;
   final List<String> labels;
   final Future<void> Function(List<String>) onSave;
   final bool obscureText;
+  final int? genderIndex;
+  final int? dateIndex;
+  final int? yearIndex;
   @override
   State<_DriverFormDialog> createState() => _DriverFormDialogState();
 }
@@ -321,17 +460,7 @@ class _DriverFormDialogState extends State<_DriverFormDialog> {
     content: SingleChildScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: List.generate(
-          _controllers.length,
-          (index) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: TextField(
-              controller: _controllers[index],
-              obscureText: widget.obscureText,
-              decoration: InputDecoration(labelText: widget.labels[index]),
-            ),
-          ),
-        ),
+        children: List.generate(_controllers.length, _buildField),
       ),
     ),
     actions: [
@@ -345,4 +474,78 @@ class _DriverFormDialogState extends State<_DriverFormDialog> {
       ),
     ],
   );
+
+  Widget _buildField(int index) {
+    final controller = _controllers[index];
+    final decoration = InputDecoration(labelText: widget.labels[index]);
+    if (widget.genderIndex == index) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: DropdownButtonFormField<String>(
+          initialValue: controller.text == 'female' ? 'female' : 'male',
+          decoration: decoration,
+          items: const [
+            DropdownMenuItem(value: 'male', child: Text('男')),
+            DropdownMenuItem(value: 'female', child: Text('女')),
+          ],
+          onChanged: (value) => controller.text = value ?? 'male',
+        ),
+      );
+    }
+    if (widget.dateIndex == index) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: TextField(
+          controller: controller,
+          readOnly: true,
+          decoration: decoration.copyWith(
+            hintText: '请选择日期',
+            suffixIcon: const Icon(Icons.calendar_today),
+          ),
+          onTap: () async {
+            final initial =
+                DateTime.tryParse(controller.text) ?? DateTime.now();
+            final selected = await showDatePicker(
+              context: context,
+              initialDate: initial,
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2100),
+            );
+            if (selected != null && mounted) {
+              setState(
+                () => controller.text = selected
+                    .toIso8601String()
+                    .split('T')
+                    .first,
+              );
+            }
+          },
+        ),
+      );
+    }
+    if (widget.yearIndex == index) {
+      final currentYear = DateTime.now().year + 1;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: DropdownButtonFormField<String>(
+          initialValue: controller.text.isEmpty ? '' : controller.text,
+          decoration: decoration,
+          items: [
+            const DropdownMenuItem(value: '', child: Text('未填写')),
+            for (var year = currentYear; year >= 1990; year--)
+              DropdownMenuItem(value: '$year', child: Text('$year 年')),
+          ],
+          onChanged: (value) => controller.text = value ?? '',
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TextField(
+        controller: controller,
+        obscureText: widget.obscureText,
+        decoration: decoration,
+      ),
+    );
+  }
 }

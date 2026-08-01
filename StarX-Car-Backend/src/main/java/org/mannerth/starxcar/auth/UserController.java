@@ -10,8 +10,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.mannerth.starxcar.auth.request.UserProfileUpdateRequest;
 import org.mannerth.starxcar.auth.request.PasswordChangeRequest;
 import org.mannerth.starxcar.auth.response.UserResponse;
+import org.mannerth.starxcar.infra.image.ImageService;
 import org.mannerth.starxcar.security.CurrentUser;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,7 +21,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -29,10 +34,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class UserController {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final ImageService imageService;
 
-    public UserController(UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    public UserController(UserMapper userMapper, PasswordEncoder passwordEncoder, ImageService imageService) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
+        this.imageService = imageService;
     }
 
     @GetMapping
@@ -41,9 +48,23 @@ public class UserController {
         return UserResponse.from(requireUser(CurrentUser.id(principal)));
     }
 
-    @PutMapping
-    @Operation(summary = "更新我的用户资料", description = "更新用户名、邮箱和性别；用户名和非空邮箱必须保持唯一。")
+    @PutMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "更新我的用户资料", description = "更新用户名、邮箱、性别、真实姓名和头像；用户名和非空邮箱必须保持唯一。")
     public UserResponse update(@AuthenticationPrincipal String principal, @Valid @RequestBody UserProfileUpdateRequest request) {
+        return update(principal, request, null, true);
+    }
+
+    @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "上传头像并更新我的用户资料", description = "当前登录用户以 multipart/form-data 提交基础资料和可选 avatar 图片文件；后端上传图片到图床后，将返回的访问 URL 保存为头像。图床不可用时不会更新用户资料。")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "资料和头像更新成功"), @ApiResponse(responseCode = "400", description = "资料或图片参数无效"), @ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @ApiResponse(responseCode = "409", description = "用户名或邮箱已存在"), @ApiResponse(responseCode = "502", description = "图床服务异常"), @ApiResponse(responseCode = "503", description = "图床账号未配置")})
+    public UserResponse updateWithAvatar(@AuthenticationPrincipal String principal,
+                                         @Valid @ModelAttribute UserProfileUpdateRequest request,
+                                         @RequestPart(value = "avatar", required = false) MultipartFile avatar) {
+        return update(principal, request, avatar, false);
+    }
+
+    private UserResponse update(String principal, UserProfileUpdateRequest request, MultipartFile avatar,
+                                boolean acceptAvatarUrl) {
         Long userId = CurrentUser.id(principal);
         User user = requireUser(userId);
         if (userMapper.exists(Wrappers.<User>lambdaQuery().eq(User::getUsername, request.username()).ne(User::getId, userId))) {
@@ -55,6 +76,12 @@ public class UserController {
         user.setUsername(request.username());
         user.setEmail(request.email());
         user.setGender(request.gender());
+        user.setRealName(request.realName());
+        if (avatar != null) {
+            user.setAvatarUrl(imageService.upload(avatar).url());
+        } else if (acceptAvatarUrl) {
+            user.setAvatarUrl(request.avatarUrl());
+        }
         userMapper.updateById(user);
         return UserResponse.from(requireUser(userId));
     }

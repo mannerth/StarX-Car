@@ -50,6 +50,7 @@ public class AuthServiceImpl implements AuthService {
         if (user == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户名或密码错误");
         }
+        requireActive(user);
         user.setLastLoginTime(LocalDateTime.now());
         userMapper.updateById(user);
         return issueTokens(user);
@@ -70,13 +71,14 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户不存在");
         }
+        requireActive(user);
         return issueTokens(user);
     }
 
     @Override
     @Transactional
     public TokenResponse registerPassenger(PassengerRegistrationRequest request) {
-        User user = createUser(request.username(), request.password(), request.email(), request.gender(), UserType.passenger);
+        User user = createUser(request.username(), request.password(), request.email(), request.gender(), request.realName(), request.avatarUrl(), UserType.passenger);
         Passenger passenger = new Passenger();
         passenger.setId(user.getId());
         passenger.setPhoneNumber(request.phoneNumber());
@@ -87,7 +89,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public TokenResponse registerDriver(DriverRegistrationRequest request) {
-        User user = createUser(request.username(), request.password(), request.email(), request.gender(), UserType.driver);
+        User user = createUser(request.username(), request.password(), request.email(), request.gender(), request.realName(), request.avatarUrl(), UserType.driver);
         Driver driver = new Driver();
         driver.setId(user.getId());
         driver.setPhoneNumber(request.phoneNumber());
@@ -96,7 +98,8 @@ public class AuthServiceImpl implements AuthService {
         return issueTokens(user);
     }
 
-    private User createUser(String username, String password, String email, GenderEnum gender, UserType type) {
+    private User createUser(String username, String password, String email, GenderEnum gender, String realName,
+                            String avatarUrl, UserType type) {
         if (userMapper.exists(Wrappers.<User>lambdaQuery().eq(User::getUsername, username))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "用户名已存在");
         }
@@ -108,9 +111,18 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordEncoder.encode(password));
         user.setEmail(email);
         user.setGender(gender);
+        user.setRealName(realName);
+        user.setAvatarUrl(avatarUrl);
         user.setType(type);
+        user.setStatus("active");
         userMapper.insert(user);
         return user;
+    }
+
+    private void requireActive(User user) {
+        if (!"active".equals(user.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "账号已停用或注销");
+        }
     }
 
     private TokenResponse issueTokens(User user) {

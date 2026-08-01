@@ -1,10 +1,13 @@
 package org.mannerth.starxcar.car;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.mannerth.starxcar.driver.Driver;
+import org.mannerth.starxcar.driver.DriverCarBinding;
+import org.mannerth.starxcar.driver.DriverCarBindingMapper;
 import org.mannerth.starxcar.driver.DriverMapper;
 import org.mannerth.starxcar.security.CurrentUser;
 import org.mannerth.starxcar.web.ApiResponse;
@@ -22,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
+
 @RestController
 @RequestMapping("/api/cars")
 @PreAuthorize("hasRole('DRIVER')")
@@ -30,10 +35,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class CarController {
     private final CarMapper carMapper;
     private final DriverMapper driverMapper;
+    private final DriverCarBindingMapper driverCarBindingMapper;
 
-    public CarController(CarMapper carMapper, DriverMapper driverMapper) {
+    public CarController(CarMapper carMapper, DriverMapper driverMapper, DriverCarBindingMapper driverCarBindingMapper) {
         this.carMapper = carMapper;
         this.driverMapper = driverMapper;
+        this.driverCarBindingMapper = driverCarBindingMapper;
     }
 
     @GetMapping("/me")
@@ -58,8 +65,7 @@ public class CarController {
         } catch (RuntimeException exception) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "车牌号已存在", exception);
         }
-        driver.setCarId(car.getId());
-        driverMapper.updateById(driver);
+        activateBinding(driver, car.getId());
         return car;
     }
 
@@ -71,15 +77,11 @@ public class CarController {
     }
 
     @PutMapping("/{carId}")
-    @Operation(summary = "更新绑定车辆", description = "仅限 driver 角色，且 carId 必须是当前司机绑定的车辆；车牌号必须唯一。")
+    @Operation(summary = "更新绑定车辆", description = "仅限 driver 角色，且 carId 必须是当前司机绑定的车辆；拆分车牌组合必须唯一。")
     public Car update(@AuthenticationPrincipal String principal, @PathVariable Long carId,
                       @Valid @RequestBody CarRequest request) {
         Car car = requireBoundCar(CurrentUser.id(principal), carId);
-        car.setLicenseNumber(request.licenseNumber());
-        car.setCarNumber(request.carNumber());
-        car.setCarType(request.carType());
-        car.setBrand(request.brand());
-        car.setColor(request.color());
+        apply(car, request);
         try {
             carMapper.updateById(car);
         } catch (RuntimeException exception) {
@@ -89,15 +91,18 @@ public class CarController {
     }
 
     @DeleteMapping("/{carId}")
-    @Operation(summary = "删除绑定车辆", description = "仅限 driver 角色，先解绑再删除车辆记录；此操作不可恢复。")
+    @Operation(summary = "停用绑定车辆", description = "仅限 driver 角色，先解绑再将车辆标记为停用，以保留司机与车辆绑定历史。")
     @Transactional
     public ApiResponse<Void> delete(@AuthenticationPrincipal String principal, @PathVariable Long carId) {
         Long driverId = CurrentUser.id(principal);
         requireBoundCar(driverId, carId);
         Driver driver = requireDriver(driverId);
+        deactivateBinding(driverId);
         driver.setCarId(null);
         driverMapper.updateById(driver);
-        carMapper.deleteById(carId);
+        Car car = requireCar(carId);
+        car.setVehicleStatus("disabled");
+        carMapper.updateById(car);
         return ApiResponse.success(null);
     }
 
@@ -127,11 +132,47 @@ public class CarController {
 
     private Car from(CarRequest request) {
         Car car = new Car();
+        apply(car, request);
+        car.setVehicleStatus("active");
+        return car;
+    }
+
+    private void apply(Car car, CarRequest request) {
         car.setLicenseNumber(request.licenseNumber());
-        car.setCarNumber(request.carNumber());
+        car.setCarNumber(request.plateProvince() + request.plateLetter().toUpperCase() + request.plateSerial().toUpperCase());
         car.setCarType(request.carType());
         car.setBrand(request.brand());
         car.setColor(request.color());
-        return car;
+        car.setPlateProvince(request.plateProvince());
+        car.setPlateLetter(request.plateLetter().toUpperCase());
+        car.setPlateSerial(request.plateSerial().toUpperCase());
+        car.setRegistrationPlace(request.registrationPlace());
+        car.setSeatCount(request.seatCount());
+        car.setVehicleYear(request.vehicleYear());
+    }
+
+    private void activateBinding(Driver driver, Long carId) {
+        DriverCarBinding carBinding = driverCarBindingMapper.selectOne(Wrappers.<DriverCarBinding>lambdaQuery()
+                .eq(DriverCarBinding::getCarId, carId)
+                .eq(DriverCarBinding::getStatus, "active"));
+        if (carBinding != null && !carBinding.getDriverId().equals(driver.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "车辆已绑定其他司机");
+        }
+        deactivateBinding(driver.getId());
+        DriverCarBinding binding = new DriverCarBinding();
+        binding.setDriverId(driver.getId());
+        binding.setCarId(carId);
+        binding.setStatus("active");
+        driverCarBindingMapper.insert(binding);
+        driver.setCarId(carId);
+        driverMapper.updateById(driver);
+    }
+
+    private void deactivateBinding(Long driverId) {
+        driverCarBindingMapper.update(null, Wrappers.<DriverCarBinding>lambdaUpdate()
+                .eq(DriverCarBinding::getDriverId, driverId)
+                .eq(DriverCarBinding::getStatus, "active")
+                .set(DriverCarBinding::getStatus, "inactive")
+                .set(DriverCarBinding::getUnbindTime, LocalDateTime.now()));
     }
 }

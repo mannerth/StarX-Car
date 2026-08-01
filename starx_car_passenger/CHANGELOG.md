@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- 个人资料编辑移除手工头像 URL 输入，改用系统相册选择图片并随 `PUT /api/users/me` Multipart 表单上传；个人中心展示后端保存的头像 URL，并保留首字默认头像。
+
+- 注册与个人中心适配真实姓名、头像地址和账号状态字段；公共用户资料模型同步读取新版响应。
+
 - Add passenger phone-number display and update flow through `/api/passengers/me`, including refresh of the backend-maintained masked number.
 
 - Rewrite README with the implemented passenger authentication/profile workflow, Riverpod structure, backend endpoint mapping, Android configuration, validation commands and remaining business scope.

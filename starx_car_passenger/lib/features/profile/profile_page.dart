@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:starx_car_common/starx_car_common.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
@@ -55,10 +56,16 @@ class _ProfileContent extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        CircleAvatar(radius: 34, child: Text(profile.username.substring(0, 1))),
+        CircleAvatar(
+          radius: 34,
+          backgroundImage: profile.avatarUrl?.isNotEmpty == true
+              ? NetworkImage(profile.avatarUrl!)
+              : null,
+          child: Text((profile.realName ?? profile.username).substring(0, 1)),
+        ),
         const SizedBox(height: 12),
         Text(
-          profile.username,
+          profile.realName ?? profile.username,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineSmall,
         ),
@@ -69,6 +76,10 @@ class _ProfileContent extends ConsumerWidget {
               ListTile(
                 title: const Text('用户名'),
                 subtitle: Text(profile.username),
+              ),
+              ListTile(
+                title: const Text('真实姓名'),
+                subtitle: Text(profile.realName ?? '未填写'),
               ),
               ListTile(
                 title: const Text('邮箱'),
@@ -170,6 +181,8 @@ class _ProfileContent extends ConsumerWidget {
   Future<void> _editProfile(BuildContext context, WidgetRef ref) async {
     final username = TextEditingController(text: profile.username);
     final email = TextEditingController(text: profile.email);
+    final realName = TextEditingController(text: profile.realName);
+    XFile? avatar;
     String gender = profile.gender;
     await showDialog<void>(
       context: context,
@@ -182,6 +195,25 @@ class _ProfileContent extends ConsumerWidget {
               TextField(
                 controller: username,
                 decoration: const InputDecoration(labelText: '用户名'),
+              ),
+              TextField(
+                controller: realName,
+                decoration: const InputDecoration(labelText: '真实姓名'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(avatar == null ? '未选择新头像' : avatar!.name),
+                trailing: OutlinedButton(
+                  onPressed: () async {
+                    final selected = await ImagePicker().pickImage(
+                      source: ImageSource.gallery,
+                      imageQuality: 85,
+                      maxWidth: 1024,
+                    );
+                    if (selected != null) setState(() => avatar = selected);
+                  },
+                  child: const Text('选择图片'),
+                ),
               ),
               TextField(
                 controller: email,
@@ -212,6 +244,8 @@ class _ProfileContent extends ConsumerWidget {
                       username: username.text.trim(),
                       email: email.text.trim(),
                       gender: gender,
+                      realName: realName.text.trim(),
+                      avatar: avatar,
                     );
                 ref.invalidate(passengerProfileProvider);
                 if (dialogContext.mounted) {
@@ -236,6 +270,7 @@ class _ProfileContent extends ConsumerWidget {
     Future<void>.delayed(const Duration(milliseconds: 300), () {
       username.dispose();
       email.dispose();
+      realName.dispose();
     });
   }
 

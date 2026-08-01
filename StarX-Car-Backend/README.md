@@ -53,11 +53,19 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 ### 乘客、司机与车辆
 
 - 乘客可查看、更新本人的手机号和注销账号。
-- 司机可查看、更新手机号和驾驶证号，绑定或解绑车辆，以及注销账号。
-- 司机可创建并自动绑定车辆，查看、编辑或删除当前绑定车辆。
-- 车辆车牌号唯一；司机只能操作本人绑定的车辆。
+- 用户可维护真实姓名和头像；管理员可维护账号状态，非 `active` 用户不能登录或刷新令牌。
+- 司机可查看、更新手机号、驾驶证号、身份证号码和驾驶证有效期，绑定或解绑车辆，以及注销账号。
+- 司机可创建并自动绑定车辆，查看、编辑或停用当前绑定车辆；车辆请求使用省份简称、发牌机关代号和号码部分，服务端自动生成完整车牌号。
+- 车辆拆分车牌组合唯一；司机只能操作本人绑定的车辆。车辆绑定和解绑同时记录 `driver_car_binding` 历史。
 - 乘客/司机号码的尾号和脱敏展示号由 MySQL 触发器维护。
 - 数据库已预留账号实名/状态、司机审核与工作状态、车辆归属地和拆分车牌字段；`driver_car_binding` 保留司机换车的绑定历史，当前 API 仍使用 `driver.car_id` 维护即时绑定关系。
+
+### 图片上传
+
+- 已登录用户可通过 `POST /api/image/upload` 上传单张图片，字段名为 `file`，后端通过服务端配置的图床账号完成上传。
+- 仅接受 `image/*` 的非空文件，沿用全局单文件 20 MB、单请求 50 MB 限制；成功返回图片密钥、原始文件名、公开 URL 和缩略图 URL。
+- 图床令牌失效时自动重新授权并重试一次；账号未配置返回 503，图床不可用或响应异常返回 502，不暴露上游错误详情。
+- 当前用户通过 `PUT /api/users/me` 的 `multipart/form-data` 资料表单上传 `avatar` 文件时，后端会先调用图床服务，再把返回 URL 保存到既有 `user.avatar_url` 字段；未附带文件时保留原头像。客户端无需、也不得单独调用图床接口。
 
 ## API 概览
 
@@ -110,6 +118,13 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 | `POST` | `/api/cars` | 创建并绑定车辆 |
 | `GET` / `PUT` / `DELETE` | `/api/cars/{carId}` | 操作当前司机绑定车辆 |
 
+图片接口（均需要登录）：
+
+| 方法 | 地址 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/image/upload` | `multipart/form-data`，字段名 `file`；上传单张图片并返回图床访问地址 |
+| `PUT` | `/api/users/me` | JSON 更新基础资料；或以 `multipart/form-data` 同时提交基础资料与可选 `avatar` 文件，上传并保存头像 |
+
 完整的请求模型、示例和错误状态码，请访问 Swagger UI：`/swagger-ui.html`。
 
 ## 配置
@@ -130,6 +145,10 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 | `ADMIN_DEFAULT_PASSWORD` | 管理员重置密码时使用的默认密码 | 当前配置为 `123456` |
 | `AMAP_KEY` | 高德地图 Key，预留 | 空 |
 | `UPLOAD_PATH` | 上传目录，预留 | 空 |
+| `IMAGE_SERVICE_BASE_URL` | 图床 API 基础地址 | `https://image.foofish.work/api/v1` |
+| `IMAGE_SERVICE_EMAIL` | 图床授权邮箱，必填 | 空 |
+| `IMAGE_SERVICE_PASSWORD` | 图床授权密码，必填 | 空 |
+| `IMAGE_SERVICE_STRATEGY_ID` | 图床存储策略 ID，可选 | 空 |
 
 > 安全提示：`ADMIN_DEFAULT_PASSWORD` 必须在正式环境显式设为强密码。不要继续使用当前开发配置中的 `123456`，也不要将真实密码写入版本控制。
 

@@ -17,6 +17,13 @@ public class Car {
     private String carType;
     private String brand;
     private String color;
+    private String plateProvince;
+    private String plateLetter;
+    private String plateSerial;
+    private String registrationPlace;
+    private Integer seatCount;
+    private Integer vehicleYear;
+    private String vehicleStatus;
     private LocalDateTime createTime;
     private LocalDateTime lastUpdateTime;
 }

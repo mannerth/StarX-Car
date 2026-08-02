@@ -44,12 +44,14 @@ public class UserController {
 
     @GetMapping
     @Operation(summary = "获取我的用户资料", description = "返回当前 accessToken 对应用户的基础资料，不包含密码。")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "查询成功"), @ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @ApiResponse(responseCode = "404", description = "用户不存在")})
     public UserResponse get(@AuthenticationPrincipal String principal) {
         return UserResponse.from(requireUser(CurrentUser.id(principal)));
     }
 
     @PutMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "更新我的用户资料", description = "更新用户名、邮箱、性别、真实姓名和头像；用户名和非空邮箱必须保持唯一。")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "更新成功"), @ApiResponse(responseCode = "400", description = "资料格式无效"), @ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @ApiResponse(responseCode = "404", description = "用户不存在"), @ApiResponse(responseCode = "409", description = "用户名或邮箱已存在")})
     public UserResponse update(@AuthenticationPrincipal String principal, @Valid @RequestBody UserProfileUpdateRequest request) {
         return update(principal, request, null, true);
     }

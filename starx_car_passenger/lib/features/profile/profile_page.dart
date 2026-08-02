@@ -11,10 +11,18 @@ final passengerRepositoryProvider = Provider<PassengerRepository>(
   (ref) => PassengerRepository(ref.read(apiClientProvider)),
 );
 final passengerProfileProvider = FutureProvider<UserProfile>(
-  (ref) => ref.read(passengerRepositoryProvider).getProfile(),
+  (ref) {
+    // Tie cached profile data to the active session. Without this dependency,
+    // logging out and then in as another passenger can show the prior account.
+    ref.watch(passengerAuthProvider);
+    return ref.read(passengerRepositoryProvider).getProfile();
+  },
 );
 final passengerDetailProvider = FutureProvider<Map<String, dynamic>>(
-  (ref) => ref.read(passengerRepositoryProvider).getPassengerProfile(),
+  (ref) {
+    ref.watch(passengerAuthProvider);
+    return ref.read(passengerRepositoryProvider).getPassengerProfile();
+  },
 );
 
 class PassengerProfilePage extends ConsumerWidget {

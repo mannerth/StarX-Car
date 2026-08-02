@@ -31,15 +31,15 @@ create unique index ui_user_username
 Admin:
 
 ```sql
-CREATE TABLE Admin
+CREATE TABLE admin
 (
-    id INT PRIMARY KEY,                          -- 与 User.id 对应
-    CONSTRAINT fk_admin_user FOREIGN KEY (id) REFERENCES User(id)
+    id INT PRIMARY KEY,                          -- 与 user.id 对应
+    CONSTRAINT fk_admin_user FOREIGN KEY (id) REFERENCES user(id)
 );
 ```
 
 ```sql
-CREATE TABLE Car
+CREATE TABLE car
 (
     id                INT AUTO_INCREMENT PRIMARY KEY,
     license_number    VARCHAR(20)  NOT NULL, -- 行驶证号
@@ -67,7 +67,7 @@ create unique index uk_car_plate
 ```
 
 ```sql
-CREATE TABLE Passenger
+CREATE TABLE passenger
 (
     id             INT PRIMARY KEY,
     phone_number   CHAR(11)     NOT NULL,
@@ -108,7 +108,7 @@ CREATE TABLE driver
     phone_number     CHAR(11)     NOT NULL,
     license_number   VARCHAR(30)  NOT NULL,
     rating           DECIMAL(2,1) NOT NULL DEFAULT 5.0,
-    car_id           INT,
+    car_id           INT NULL COMMENT '当前实际使用的车辆 ID；司机可有多辆有效绑定车辆',
     display_phone    VARCHAR(11)  NOT NULL,  -- 普通列，触发器填充
     id_card_no       VARCHAR(18)  NULL,      -- 身份证号码
     license_expire_date DATE       NULL,      -- 驾驶证有效期
@@ -145,11 +145,11 @@ DELIMITER ;
 CREATE TABLE driver_car_binding
 (
     id           INT AUTO_INCREMENT PRIMARY KEY,
-    driver_id    INT NOT NULL, -- 司机用户ID
-    car_id       INT NOT NULL, -- 车辆ID
+    driver_id    INT NOT NULL, -- 司机用户ID；同一司机可有多条有效绑定记录
+    car_id       INT NOT NULL, -- 车辆ID；同一车辆同一时间只能有效绑定一名司机
     bind_time    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     unbind_time  DATETIME NULL,
-    status       VARCHAR(20) NOT NULL DEFAULT 'active', -- active、inactive
+    status       VARCHAR(20) NOT NULL DEFAULT 'active', -- active 表示有效绑定，不等同于 driver.car_id 指向的当前用车；inactive 表示已解绑历史
     CONSTRAINT fk_binding_driver FOREIGN KEY (driver_id) REFERENCES driver(id),
     CONSTRAINT fk_binding_car FOREIGN KEY (car_id) REFERENCES car(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

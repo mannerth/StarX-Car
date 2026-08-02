@@ -29,7 +29,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String userId = authentication != null && authentication.isAuthenticated()
                     && !(authentication instanceof AnonymousAuthenticationToken)
-                    ? String.valueOf(authentication.getPrincipal()) : "anonymous";
+                    ? authentication.getName() : "anonymous";
             log.info("HTTP {} {} status={} durationMs={} userId={}", request.getMethod(), request.getRequestURI(),
                     response.getStatus(), elapsedMs, userId);
         }

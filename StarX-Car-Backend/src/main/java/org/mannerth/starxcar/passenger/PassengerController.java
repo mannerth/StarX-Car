@@ -2,6 +2,7 @@ package org.mannerth.starxcar.passenger;
 
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.mannerth.starxcar.auth.UserMapper;
@@ -35,12 +36,14 @@ public class PassengerController {
 
     @GetMapping
     @Operation(summary = "获取我的乘客资料", description = "仅限 passenger 角色；手机号展示值由数据库触发器生成。")
+    @ApiResponses({@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "查询成功"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "非乘客角色"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "乘客资料不存在")})
     public Passenger get(@AuthenticationPrincipal String principal) {
         return requirePassenger(CurrentUser.id(principal));
     }
 
     @PutMapping
     @Operation(summary = "更新我的手机号", description = "仅限 passenger 角色；修改手机号后由数据库触发器更新尾号和脱敏展示号码。")
+    @ApiResponses({@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "更新成功"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "手机号格式无效"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "非乘客角色"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "乘客资料不存在")})
     public Passenger update(@AuthenticationPrincipal String principal, @Valid @RequestBody PassengerUpdateRequest request) {
         Passenger passenger = requirePassenger(CurrentUser.id(principal));
         passenger.setPhoneNumber(request.phoneNumber());
@@ -50,6 +53,7 @@ public class PassengerController {
 
     @DeleteMapping
     @Operation(summary = "注销乘客账号", description = "删除当前乘客资料及对应用户账号，此操作不可恢复。")
+    @ApiResponses({@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "注销成功"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "非乘客角色")})
     @Transactional
     public ApiResponse<Void> delete(@AuthenticationPrincipal String principal) {
         Long userId = CurrentUser.id(principal);

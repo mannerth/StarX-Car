@@ -20,9 +20,9 @@
 ### HTTP 与令牌刷新
 
 - `ApiClient` 基于 Dio，统一使用后端 `/api` 响应信封，成功时返回 `data` 字段。
-- `ApiClient.putMultipart`：统一发送带 Bearer Token 的 Multipart 请求；乘客端和司机端用它随个人资料提交头像文件，不直接访问图床服务。
+- `ApiClient.putMultipart`：统一发送带 Bearer Token 的 Multipart 请求；根据文件名推导图片 MIME 类型，确保头像文件能通过后端类型校验；乘客端和司机端不直接访问图床服务。
 - 每个请求自动读取安全会话并附加 `Authorization: Bearer <accessToken>`。
-- 收到业务请求的 `401` 时，使用 refresh token 请求 `/auth/refresh`；同一时刻的多个 `401` 合并为一次刷新请求，刷新成功后自动重放原请求。
+- 收到业务请求的 `401` 时，使用 refresh token 请求 `/auth/refresh`；刷新请求不会附带旧 access token，同一时刻的多个 `401` 合并为一次刷新请求，刷新成功后自动重放原请求。
 - 刷新失败或不存在会话时清除本地会话；调用方可据此返回登录页。
 - `ApiException` 只保留可展示的服务端消息、HTTP 状态和 trace ID，不暴露底层异常详情。
 

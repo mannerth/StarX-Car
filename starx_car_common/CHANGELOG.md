@@ -1,5 +1,8 @@
 ## Unreleased
 
+- `ApiClient.putMultipart` 现在按文件名推导 multipart 图片 MIME 类型，修复 `MultipartFile.fromBytes` 默认 `application/octet-stream` 被后端图片校验拒绝的问题。
+- 刷新令牌请求标记为跳过 Bearer 拦截器，避免把即将失效的 access token 附加到 `/auth/refresh`。
+
 - 新增 `ApiClient.putMultipart`，为角色端的资料表单提供带鉴权、统一响应解析及 401 刷新的图片文件上传传输能力；不包含任何角色业务流程。
 
 - 扩展共享 `UserProfile`，解析真实姓名、头像地址和账号状态字段。

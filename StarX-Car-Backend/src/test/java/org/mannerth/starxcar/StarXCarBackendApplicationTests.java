@@ -4,6 +4,10 @@ import org.junit.jupiter.api.Test;
 import org.mannerth.starxcar.auth.UserMapper;
 import org.mannerth.starxcar.auth.User;
 import org.mannerth.starxcar.car.CarMapper;
+import org.mannerth.starxcar.car.Car;
+import org.mannerth.starxcar.constant.UserType;
+import org.mannerth.starxcar.driver.Driver;
+import org.mannerth.starxcar.driver.DriverCarBinding;
 import org.mannerth.starxcar.driver.DriverMapper;
 import org.mannerth.starxcar.driver.DriverCarBindingMapper;
 import org.mannerth.starxcar.infra.image.ImageService;
@@ -22,10 +26,13 @@ import org.springframework.security.test.context.support.WithMockUser;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 import java.util.Map;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -139,6 +146,79 @@ class StarXCarBackendApplicationTests {
 
         verify(imageService).upload(any());
         verify(userMapper).updateById(user);
+    }
+
+    @Test
+    void driverCanListAllActiveBoundCars() throws Exception {
+        Driver driver = new Driver();
+        driver.setId(1L);
+        DriverCarBinding binding = new DriverCarBinding();
+        binding.setDriverId(1L);
+        binding.setCarId(7L);
+        Car car = new Car();
+        car.setId(7L);
+        car.setCarNumber("粤A12345");
+        given(driverMapper.selectById(1L)).willReturn(driver);
+        given(driverCarBindingMapper.selectList(any())).willReturn(java.util.List.of(binding));
+        given(carMapper.selectBatchIds(any())).willReturn(java.util.List.of(car));
+
+        mockMvc.perform(get("/api/drivers/me/cars")
+                        .header("Authorization", "Bearer " + driverToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(7));
+    }
+
+    @Test
+    void driverCanSwitchToAnAlreadyBoundCar() throws Exception {
+        Driver driver = new Driver();
+        driver.setId(1L);
+        driver.setCarId(3L);
+        Car car = new Car();
+        car.setId(7L);
+        car.setVehicleStatus("active");
+        given(driverMapper.selectById(1L)).willReturn(driver);
+        given(carMapper.selectById(7L)).willReturn(car);
+        given(driverCarBindingMapper.exists(any())).willReturn(true);
+
+        mockMvc.perform(put("/api/drivers/me/current-car")
+                        .header("Authorization", "Bearer " + driverToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"carId\":7}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.carId").value(7));
+
+        verify(driverMapper).updateById(driver);
+        verify(driverCarBindingMapper, never()).insert(any(DriverCarBinding.class));
+    }
+
+    @Test
+    void driverCancellationKeepsBindingHistoryAndCancelsAccount() throws Exception {
+        Driver driver = new Driver();
+        driver.setId(1L);
+        driver.setCarId(7L);
+        User user = new User();
+        user.setId(1L);
+        user.setType(UserType.driver);
+        user.setStatus("active");
+        given(driverMapper.selectById(1L)).willReturn(driver);
+        given(userMapper.selectById(1L)).willReturn(user);
+
+        mockMvc.perform(delete("/api/drivers/me")
+                        .header("Authorization", "Bearer " + driverToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0));
+
+        verify(driverCarBindingMapper, never()).delete(any());
+        verify(driverMapper, never()).deleteById(1L);
+        verify(userMapper, never()).deleteById(1L);
+        verify(driverMapper).updateById(driver);
+        verify(userMapper).updateById(user);
+        org.assertj.core.api.Assertions.assertThat(driver.getCarId()).isNull();
+        org.assertj.core.api.Assertions.assertThat(user.getStatus()).isEqualTo("cancelled");
+    }
+
+    private String driverToken() {
+        return jwtService.createToken("1", Map.of("role", "driver", "token_type", "access"));
     }
 
 }

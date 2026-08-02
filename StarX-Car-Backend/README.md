@@ -46,7 +46,7 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 - 用户分页查询；支持用户名/邮箱关键字和角色筛选。
 - 查看用户基础资料，不返回密码。
 - 编辑任意用户的用户名、邮箱、性别；用户名和非空邮箱保持唯一。
-- 删除乘客/司机：在事务中先删除 `passenger` 或 `driver` 扩展资料，再删除 `user` 主记录。
+- 管理员删除乘客/司机仍为物理删除；司机自行注销则改为标记账号 `cancelled`，保留司机资料和车辆绑定历史。
 - 不允许通过管理接口删除管理员账号或当前登录管理员。
 - 任一管理员可重置任意用户密码（包括管理员）为配置的默认密码。
 
@@ -54,9 +54,9 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 
 - 乘客可查看、更新本人的手机号和注销账号。
 - 用户可维护真实姓名和头像；管理员可维护账号状态，非 `active` 用户不能登录或刷新令牌。
-- 司机可查看、更新手机号、驾驶证号、身份证号码和驾驶证有效期，绑定或解绑车辆，以及注销账号。
-- 司机可创建并自动绑定车辆，查看、编辑或停用当前绑定车辆；车辆请求使用省份简称、发牌机关代号和号码部分，服务端自动生成完整车牌号。
-- 车辆拆分车牌组合唯一；司机只能操作本人绑定的车辆。车辆绑定和解绑同时记录 `driver_car_binding` 历史。
+- 司机可查看、更新手机号、驾驶证号、身份证号码和驾驶证有效期，绑定多辆车辆、切换或解绑当前用车，以及注销账号。
+- 司机可创建并自动绑定车辆，查看、编辑或停用当前用车；车辆请求使用省份简称、发牌机关代号和号码部分，服务端自动生成完整车牌号。
+- 车辆拆分车牌组合唯一；`driver_car_binding` 保存有效及历史绑定，司机可拥有多辆有效绑定车辆；`driver.car_id` 只表示当前实际使用的车辆。车辆绑定和解绑同时记录历史。
 - 乘客/司机号码的尾号和脱敏展示号由 MySQL 触发器维护。
 - 数据库已预留账号实名/状态、司机审核与工作状态、车辆归属地和拆分车牌字段；`driver_car_binding` 保留司机换车的绑定历史，当前 API 仍使用 `driver.car_id` 维护即时绑定关系。
 
@@ -98,7 +98,10 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 | `POST` | `/api/users/me/password` | 任意登录用户 | 验证原密码后修改密码 |
 | `GET` / `PUT` / `DELETE` | `/api/passengers/me` | 乘客 | 管理/注销本人乘客资料 |
 | `GET` / `PUT` / `DELETE` | `/api/drivers/me` | 司机 | 管理/注销本人司机资料 |
-| `PUT` / `DELETE` | `/api/drivers/me/car` | 司机 | 绑定或解绑车辆 |
+| `GET` | `/api/drivers/me/cars` | 司机 | 获取本人全部有效绑定车辆 |
+| `PUT` | `/api/drivers/me/car` | 司机 | 绑定车辆并设为当前用车 |
+| `PUT` | `/api/drivers/me/current-car` | 司机 | 在本人有效绑定车辆中切换当前用车 |
+| `DELETE` | `/api/drivers/me/car` | 司机 | 解绑当前用车 |
 
 管理员接口（均需要 `ROLE_ADMIN`）：
 
@@ -114,9 +117,9 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 
 | 方法 | 地址 | 说明 |
 | --- | --- | --- |
-| `GET` | `/api/cars/me` | 获取当前绑定车辆 |
-| `POST` | `/api/cars` | 创建并绑定车辆 |
-| `GET` / `PUT` / `DELETE` | `/api/cars/{carId}` | 操作当前司机绑定车辆 |
+| `GET` | `/api/cars/me` | 获取当前用车 |
+| `POST` | `/api/cars` | 创建、绑定并设为当前用车 |
+| `GET` / `PUT` / `DELETE` | `/api/cars/{carId}` | 操作当前司机用车 |
 
 图片接口（均需要登录）：
 
@@ -142,7 +145,7 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 | `JWT_SECRET` | JWT 签名密钥，必填 | 无 |
 | `JWT_EXPIRE` | access token 有效期（秒） | `3600` |
 | `JWT_REFRESH_EXPIRE` | refresh token 有效期（秒） | `604800` |
-| `ADMIN_DEFAULT_PASSWORD` | 管理员重置密码时使用的默认密码 | 当前配置为 `123456` |
+| `ADMIN_DEFAULT_PASSWORD` | 管理员重置密码时使用的默认密码，必填且长度为 6 至 72 | 无 |
 | `AMAP_KEY` | 高德地图 Key，预留 | 空 |
 | `UPLOAD_PATH` | 上传目录，预留 | 空 |
 | `IMAGE_SERVICE_BASE_URL` | 图床 API 基础地址 | `https://image.foofish.work/api/v1` |
@@ -150,7 +153,7 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 | `IMAGE_SERVICE_PASSWORD` | 图床授权密码，必填 | 空 |
 | `IMAGE_SERVICE_STRATEGY_ID` | 图床存储策略 ID，可选 | 空 |
 
-> 安全提示：`ADMIN_DEFAULT_PASSWORD` 必须在正式环境显式设为强密码。不要继续使用当前开发配置中的 `123456`，也不要将真实密码写入版本控制。
+> 安全提示：`ADMIN_DEFAULT_PASSWORD` 必须显式设为强密码，应用不会提供弱默认值；不要将真实密码写入版本控制。
 
 例如，在 Unix-like Shell 中：
 

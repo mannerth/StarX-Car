@@ -10,13 +10,24 @@ final driverRepositoryProvider = Provider<DriverRepository>(
   (ref) => DriverRepository(ref.read(apiClientProvider)),
 );
 final userProfileProvider = FutureProvider<UserProfile>(
-  (ref) => ref.read(driverRepositoryProvider).getUser(),
+  (ref) {
+    // Recreate data providers whenever a different driver session is restored
+    // or established; otherwise Riverpod can retain a previous driver's data.
+    ref.watch(driverAuthProvider);
+    return ref.read(driverRepositoryProvider).getUser();
+  },
 );
 final driverProfileProvider = FutureProvider<Map<String, dynamic>>(
-  (ref) => ref.read(driverRepositoryProvider).getDriver(),
+  (ref) {
+    ref.watch(driverAuthProvider);
+    return ref.read(driverRepositoryProvider).getDriver();
+  },
 );
 final carProvider = FutureProvider<Map<String, dynamic>?>(
-  (ref) => ref.read(driverRepositoryProvider).getCar(),
+  (ref) {
+    ref.watch(driverAuthProvider);
+    return ref.read(driverRepositoryProvider).getCar();
+  },
 );
 
 class DriverHomePage extends ConsumerWidget {

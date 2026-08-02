@@ -17,7 +17,7 @@ class ApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           final session = await _store.read();
-          if (session != null) {
+          if (session != null && options.extra['skipAuthentication'] != true) {
             options.headers['Authorization'] = 'Bearer ${session.accessToken}';
           }
           handler.next(options);
@@ -66,7 +66,14 @@ class ApiClient {
     final data = FormData.fromMap({
       ...fields,
       if (fileBytes != null)
-        fileField: MultipartFile.fromBytes(fileBytes, filename: fileName ?? 'upload'),
+        fileField: MultipartFile.fromBytes(
+          fileBytes,
+          filename: fileName ?? 'upload',
+          // The server correctly rejects generic octet-stream uploads. Dio
+          // does not infer it for byte-based parts, so derive it from the
+          // selected file name before submitting an image picked by either app.
+          contentType: MultipartFile.lookupMediaType(fileName),
+        ),
     });
     return _request(() => _dio.put<dynamic>(path, data: data));
   }
@@ -114,7 +121,7 @@ class ApiClient {
     final response = await _dio.post<dynamic>(
       '/auth/refresh',
       data: {'refreshToken': session.refreshToken},
-      options: Options(headers: {'Authorization': null}),
+      options: Options(extra: {'skipAuthentication': true}),
     );
     final data = _unwrap(response.data) as Map<String, dynamic>;
     final user = data['user'] as Map<String, dynamic>;

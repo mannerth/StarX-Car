@@ -44,7 +44,7 @@ mybatis-plus:
 
     db-config:
 
-      id-type: assign_id
+      id-type: auto
 
       table-underline: true
 
@@ -90,7 +90,7 @@ jwt:
   refresh-expire: ${JWT_REFRESH_EXPIRE:604800}
 
 admin:
-  default-password: ${ADMIN_DEFAULT_PASSWORD:123456}
+  default-password: ${ADMIN_DEFAULT_PASSWORD}
 
 amap:
 

@@ -62,6 +62,7 @@ lib/
 - application ID：`org.mannerth.starxcar.driver`。
 - 默认后端地址：`http://10.0.2.2:8080/api`；可通过 `--dart-define=API_BASE_URL=...` 覆盖。
 - 本地开发允许 HTTP，生产必须改用 HTTPS。
+- 因工程位于 D 盘、Flutter Pub 缓存位于 C 盘，已关闭 Kotlin 增量编译并使用进程内编译，避免 `image_picker_android` 的跨盘缓存错误；首次 Android 构建会稍慢。
 - 未配置 `android/key.properties` 时仍可构建 debug APK；配置本机 release 签名后 release 构建会自动使用它。
 - 签名文件和 `key.properties` 均不可提交、删除或分享。
 

@@ -61,6 +61,7 @@ lib/
 - application ID：`org.mannerth.starxcar.passenger`。
 - 默认 API 地址：`http://10.0.2.2:8080/api`，适用于 Android 模拟器访问本机后端；也可用 `--dart-define=API_BASE_URL=http://<host>:<port>/api` 覆盖。
 - 为本地 HTTP 开发已允许 Android 明文流量；部署环境必须使用 HTTPS。
+- 因工程位于 D 盘、Flutter Pub 缓存位于 C 盘，已关闭 Kotlin 增量编译并使用进程内编译，避免 `image_picker_android` 的跨盘缓存错误；首次 Android 构建会稍慢。
 - `android/key.properties` 与 release keystore 均为本机敏感文件，已忽略，不能提交或分享。
 
 ```powershell

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Android Gradle 配置关闭 Kotlin 增量缓存并改用进程内编译，修复 Windows 下工程目录与 Pub 缓存分属不同盘符时 `image_picker_android` 编译失败的问题。
+
 - 个人资料与乘客资料 Provider 改为依赖当前认证会话；退出或切换账号后会使旧缓存失效，防止新会话短暂展示上一乘客的资料或手机号。
 
 - 个人资料编辑移除手工头像 URL 输入，改用系统相册选择图片并随 `PUT /api/users/me` Multipart 表单上传；个人中心展示后端保存的头像 URL，并保留首字默认头像。

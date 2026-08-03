@@ -6,29 +6,100 @@ import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
 import 'driver_repository.dart';
 
+const _plateProvinces = <String>[
+  '京',
+  '津',
+  '冀',
+  '晋',
+  '蒙',
+  '辽',
+  '吉',
+  '黑',
+  '沪',
+  '苏',
+  '浙',
+  '皖',
+  '闽',
+  '赣',
+  '鲁',
+  '豫',
+  '鄂',
+  '湘',
+  '粤',
+  '桂',
+  '琼',
+  '渝',
+  '川',
+  '贵',
+  '云',
+  '藏',
+  '陕',
+  '甘',
+  '青',
+  '宁',
+  '新',
+];
+
+const _plateLetters = <String>[
+  'A',
+  'B',
+  'C',
+  'D',
+  'E',
+  'F',
+  'G',
+  'H',
+  'J',
+  'K',
+  'L',
+  'M',
+  'N',
+  'P',
+  'Q',
+  'R',
+  'S',
+  'T',
+  'U',
+  'V',
+  'W',
+  'X',
+  'Y',
+  'Z',
+];
+
+const _carColors = <String>[
+  '白色',
+  '黑色',
+  '银色',
+  '灰色',
+  '红色',
+  '金色',
+  '蓝色',
+  '棕色',
+  '紫色',
+  '绿色',
+  '黄色',
+  '粉色',
+  '橙色',
+];
+
 final driverRepositoryProvider = Provider<DriverRepository>(
   (ref) => DriverRepository(ref.read(apiClientProvider)),
 );
-final userProfileProvider = FutureProvider<UserProfile>(
-  (ref) {
-    // Recreate data providers whenever a different driver session is restored
-    // or established; otherwise Riverpod can retain a previous driver's data.
-    ref.watch(driverAuthProvider);
-    return ref.read(driverRepositoryProvider).getUser();
-  },
-);
-final driverProfileProvider = FutureProvider<Map<String, dynamic>>(
-  (ref) {
-    ref.watch(driverAuthProvider);
-    return ref.read(driverRepositoryProvider).getDriver();
-  },
-);
-final carProvider = FutureProvider<Map<String, dynamic>?>(
-  (ref) {
-    ref.watch(driverAuthProvider);
-    return ref.read(driverRepositoryProvider).getCar();
-  },
-);
+final userProfileProvider = FutureProvider<UserProfile>((ref) {
+  // Recreate data providers whenever a different driver session is restored
+  // or established; otherwise Riverpod can retain a previous driver's data.
+  ref.watch(driverAuthProvider);
+  return ref.read(driverRepositoryProvider).getUser();
+});
+final driverProfileProvider = FutureProvider<Map<String, dynamic>>((ref) {
+  ref.watch(driverAuthProvider);
+  return ref.read(driverRepositoryProvider).getDriver();
+});
+final carProvider = FutureProvider<Map<String, dynamic>?>((ref) {
+  ref.watch(driverAuthProvider);
+  return ref.read(driverRepositoryProvider).getCar();
+});
 
 class DriverHomePage extends ConsumerWidget {
   const DriverHomePage({super.key});
@@ -197,9 +268,9 @@ class DriverProfileTab extends ConsumerWidget {
       ref.invalidate(userProfileProvider);
     } on ApiException catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
       }
     }
   }
@@ -338,6 +409,11 @@ class CarTab extends ConsumerWidget {
         '颜色',
       ],
       yearIndex: 6,
+      selectOptions: const {
+        1: _plateProvinces,
+        2: _plateLetters,
+        9: _carColors,
+      },
       onSave: (values) async {
         final seatCount = int.tryParse(values[5].trim());
         final vehicleYear = values[6].trim().isEmpty
@@ -346,10 +422,13 @@ class CarTab extends ConsumerWidget {
         if (seatCount == null || seatCount < 1 || seatCount > 9) {
           throw const ApiException('核定载客数应为 1 到 9。');
         }
-        if (values[1].trim().length != 1 ||
-            !RegExp(r'^[A-Za-z]$').hasMatch(values[2].trim()) ||
+        if (!_plateProvinces.contains(values[1]) ||
+            !_plateLetters.contains(values[2]) ||
             values[3].trim().isEmpty) {
-          throw const ApiException('请填写规范的拆分车牌信息。');
+          throw const ApiException('请选择规范的车牌省份和字母，并填写车牌号码部分。');
+        }
+        if (!_carColors.contains(values[9])) {
+          throw const ApiException('请选择车辆颜色。');
         }
         if (values[6].trim().isNotEmpty && vehicleYear == null) {
           throw const ApiException('出厂年份必须是数字。');
@@ -387,6 +466,7 @@ Future<void> _showDriverFormDialog(
   int? genderIndex,
   int? dateIndex,
   int? yearIndex,
+  Map<int, List<String>> selectOptions = const {},
 }) => showDialog<void>(
   context: context,
   builder: (_) => _DriverFormDialog(
@@ -398,6 +478,7 @@ Future<void> _showDriverFormDialog(
     genderIndex: genderIndex,
     dateIndex: dateIndex,
     yearIndex: yearIndex,
+    selectOptions: selectOptions,
   ),
 );
 
@@ -411,6 +492,7 @@ class _DriverFormDialog extends StatefulWidget {
     required this.genderIndex,
     required this.dateIndex,
     required this.yearIndex,
+    required this.selectOptions,
   });
   final String title;
   final List<String> initialValues;
@@ -420,6 +502,7 @@ class _DriverFormDialog extends StatefulWidget {
   final int? genderIndex;
   final int? dateIndex;
   final int? yearIndex;
+  final Map<int, List<String>> selectOptions;
   @override
   State<_DriverFormDialog> createState() => _DriverFormDialogState();
 }
@@ -545,6 +628,24 @@ class _DriverFormDialogState extends State<_DriverFormDialog> {
             const DropdownMenuItem(value: '', child: Text('未填写')),
             for (var year = currentYear; year >= 1990; year--)
               DropdownMenuItem(value: '$year', child: Text('$year 年')),
+          ],
+          onChanged: (value) => controller.text = value ?? '',
+        ),
+      );
+    }
+    final options = widget.selectOptions[index];
+    if (options != null) {
+      final selected = options.contains(controller.text) ? controller.text : '';
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: DropdownButtonFormField<String>(
+          initialValue: selected,
+          decoration: decoration,
+          items: [
+            const DropdownMenuItem(value: '', child: Text('请选择')),
+            ...options.map(
+              (option) => DropdownMenuItem(value: option, child: Text(option)),
+            ),
           ],
           onChanged: (value) => controller.text = value ?? '',
         ),

@@ -22,7 +22,8 @@ import org.mannerth.starxcar.web.RestAuthenticationEntryPoint;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties({JwtProperties.class, AdminProperties.class, ImageUploadProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, AdminProperties.class, ImageUploadProperties.class,
+        DriverLocationProperties.class})
 public class SecurityConfig {
 
     @Bean

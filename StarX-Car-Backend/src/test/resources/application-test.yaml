@@ -14,6 +14,14 @@ admin:
 
 amap:
   key: test-amap-key
+  web-service-base-url: https://amap.test
+  driving-route-path: /v5/direction/driving
+  connect-timeout-ms: 3000
+  read-timeout-ms: 5000
+
+driver-location:
+  freshness-seconds: 30
+  max-recorded-time-future-seconds: 60
 
 file:
   upload-path: ./target/uploads

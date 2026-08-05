@@ -4,6 +4,7 @@ import org.mannerth.starxcar.config.ImageUploadProperties;
 import org.mannerth.starxcar.infra.image.model.ImageApiResponse;
 import org.mannerth.starxcar.infra.image.model.ImageTokenData;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -17,7 +18,7 @@ public class ImageTokenService {
     private final ImageUploadProperties properties;
     private volatile String token;
 
-    public ImageTokenService(RestClient imageRestClient, ImageUploadProperties properties) {
+    public ImageTokenService(@Qualifier("imageRestClient") RestClient imageRestClient, ImageUploadProperties properties) {
         this.imageRestClient = imageRestClient;
         this.properties = properties;
     }

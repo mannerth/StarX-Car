@@ -160,3 +160,179 @@ CREATE INDEX idx_binding_driver_status
 CREATE INDEX idx_binding_car_status
     ON driver_car_binding (car_id, status);
 ```
+
+计价规则：
+
+```sql
+CREATE TABLE pricing_rule
+(
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    name                VARCHAR(50)    NOT NULL COMMENT '规则名称',
+    version             INT            NOT NULL DEFAULT 1 COMMENT '同一规则名称的版本号',
+    status              VARCHAR(20)    NOT NULL DEFAULT 'draft' COMMENT 'draft、active、inactive、archived',
+    is_default          TINYINT(1)     NOT NULL DEFAULT 0 COMMENT '是否当前默认规则；服务层保证至多一条 active 默认规则',
+    base_fare           DECIMAL(10, 2) NOT NULL COMMENT '起步价',
+    included_distance_m INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT '起步价包含距离，单位米',
+    minimum_fare        DECIMAL(10, 2) NOT NULL DEFAULT 0 COMMENT '最低消费',
+    created_by          INT            NULL COMMENT '创建管理员 user.id',
+    updated_by          INT            NULL COMMENT '最后修改管理员 user.id',
+    created_time        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_time        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_pricing_rule_creator FOREIGN KEY (created_by) REFERENCES user (id),
+    CONSTRAINT fk_pricing_rule_updater FOREIGN KEY (updated_by) REFERENCES user (id),
+    CONSTRAINT uk_pricing_rule_name_version UNIQUE (name, version),
+    KEY idx_pricing_rule_status_default (status, is_default)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE pricing_rule_tier
+(
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    rule_id       INT            NOT NULL,
+    charge_type   VARCHAR(20)    NOT NULL COMMENT 'DISTANCE、DRIVING_TIME、WAITING_TIME',
+    range_start   INT UNSIGNED   NOT NULL COMMENT '累计区间起点；距离单位米，时间单位秒，包含起点',
+    range_end     INT UNSIGNED   NULL COMMENT '累计区间终点；NULL 表示无上限，不包含终点',
+    unit_size     INT UNSIGNED   NOT NULL COMMENT '计费单位；如 1000 米或 60 秒',
+    unit_price    DECIMAL(10, 2) NOT NULL COMMENT '每个计费单位的价格',
+    rounding_mode VARCHAR(20)    NOT NULL DEFAULT 'CEIL' COMMENT '不足一单位按一单位计',
+    sort_no       INT UNSIGNED   NOT NULL COMMENT '同一计费类型内的计算顺序',
+    CONSTRAINT fk_pricing_rule_tier_rule FOREIGN KEY (rule_id) REFERENCES pricing_rule (id),
+    CONSTRAINT uk_pricing_rule_tier UNIQUE (rule_id, charge_type, sort_no),
+    KEY idx_pricing_rule_tier_range (rule_id, charge_type, range_start)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+```
+
+订单、计费明细和最新司机位置：
+
+```sql
+CREATE TABLE ride_order
+(
+    id                   BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_no             VARCHAR(32)    NOT NULL COMMENT '对外订单号',
+    passenger_id         INT            NOT NULL,
+    driver_id            INT            NULL COMMENT '抢单成功后写入',
+    car_id               INT            NULL COMMENT '抢单成功时写入 driver.car_id 快照',
+    pricing_rule_id      INT            NOT NULL COMMENT '下单时采用的规则',
+    pricing_rule_version INT            NOT NULL COMMENT '下单时规则版本快照',
+    status               VARCHAR(30)    NOT NULL COMMENT 'PENDING、ACCEPTED、DRIVER_ARRIVED、IN_SERVICE、COMPLETED、CANCELLED',
+    version              INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT '乐观锁版本，防止多人同时抢单',
+    payment_status       VARCHAR(20)    NOT NULL DEFAULT 'unpaid' COMMENT '一期固定为 unpaid',
+
+    pickup_poi_id        VARCHAR(64)    NULL,
+    pickup_name          VARCHAR(100)   NOT NULL,
+    pickup_address       VARCHAR(255)   NULL,
+    pickup_lat           DECIMAL(10, 6) NOT NULL COMMENT 'GCJ-02 纬度',
+    pickup_lng           DECIMAL(10, 6) NOT NULL COMMENT 'GCJ-02 经度',
+    destination_poi_id   VARCHAR(64)    NULL,
+    destination_name     VARCHAR(100)   NOT NULL,
+    destination_address  VARCHAR(255)   NULL,
+    destination_lat      DECIMAL(10, 6) NOT NULL COMMENT 'GCJ-02 纬度',
+    destination_lng      DECIMAL(10, 6) NOT NULL COMMENT 'GCJ-02 经度',
+
+    estimated_distance_m INT UNSIGNED   NOT NULL COMMENT '高德规划距离',
+    estimated_duration_s INT UNSIGNED   NOT NULL COMMENT '高德规划时长',
+    billing_distance_m   INT UNSIGNED   NOT NULL COMMENT '一期按下单时高德规划距离计费',
+    actual_duration_s    INT UNSIGNED   NULL COMMENT '开始服务至完成的实际时长',
+    waiting_duration_s   INT UNSIGNED   NULL COMMENT '司机到达到开始服务的等待时长',
+    base_fare            DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    distance_fare        DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    driving_time_fare    DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    waiting_fare         DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    total_fare           DECIMAL(10, 2) NOT NULL DEFAULT 0,
+
+    created_time         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    accepted_time        DATETIME       NULL,
+    driver_arrived_time  DATETIME       NULL,
+    service_started_time DATETIME       NULL,
+    completed_time       DATETIME       NULL,
+    cancelled_time       DATETIME       NULL,
+    cancelled_by         VARCHAR(20)    NULL COMMENT 'passenger、driver',
+    cancel_reason        VARCHAR(255)   NULL,
+    updated_time         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_ride_order_passenger FOREIGN KEY (passenger_id) REFERENCES passenger (id),
+    CONSTRAINT fk_ride_order_driver FOREIGN KEY (driver_id) REFERENCES driver (id),
+    CONSTRAINT fk_ride_order_car FOREIGN KEY (car_id) REFERENCES car (id),
+    CONSTRAINT fk_ride_order_pricing_rule FOREIGN KEY (pricing_rule_id) REFERENCES pricing_rule (id),
+    CONSTRAINT uk_ride_order_no UNIQUE (order_no),
+    KEY idx_ride_order_passenger_created (passenger_id, created_time),
+    KEY idx_ride_order_driver_status_created (driver_id, status, created_time),
+    KEY idx_ride_order_status_created (status, created_time)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE ride_order_event
+(
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id      BIGINT       NOT NULL,
+    event_type    VARCHAR(30)  NOT NULL COMMENT 'CREATE、ACCEPT、ARRIVE、START_SERVICE、COMPLETE、CANCEL',
+    from_status   VARCHAR(30)  NULL,
+    to_status     VARCHAR(30)  NOT NULL,
+    operator_type VARCHAR(20)  NOT NULL COMMENT 'passenger、driver、system、admin',
+    operator_id   INT          NULL COMMENT 'system 时为空',
+    remark        VARCHAR(255) NULL,
+    created_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_ride_order_event_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    KEY idx_ride_order_event_order_time (order_id, created_time)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE order_fare_item
+(
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id      BIGINT         NOT NULL,
+    charge_type   VARCHAR(20)    NOT NULL COMMENT 'BASE、DISTANCE、DRIVING_TIME、WAITING_TIME',
+    rule_id       INT            NOT NULL,
+    rule_version  INT            NOT NULL,
+    tier_id       INT            NULL COMMENT 'BASE 项为空',
+    range_start   INT UNSIGNED   NULL COMMENT '规则快照区间起点',
+    range_end     INT UNSIGNED   NULL COMMENT '规则快照区间终点',
+    actual_usage  INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT '参与计费的米数或秒数',
+    unit_size     INT UNSIGNED   NULL,
+    unit_price    DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    charged_units INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT 'CEIL 后的单位数',
+    amount        DECIMAL(10, 2) NOT NULL,
+    created_time  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_order_fare_item_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    CONSTRAINT fk_order_fare_item_rule FOREIGN KEY (rule_id) REFERENCES pricing_rule (id),
+    CONSTRAINT fk_order_fare_item_tier FOREIGN KEY (tier_id) REFERENCES pricing_rule_tier (id),
+    KEY idx_order_fare_item_order (order_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE driver_location
+(
+    driver_id       INT PRIMARY KEY,
+    active_order_id BIGINT         NULL,
+    latitude        DECIMAL(10, 6) NOT NULL COMMENT 'GCJ-02 纬度',
+    longitude       DECIMAL(10, 6) NOT NULL COMMENT 'GCJ-02 经度',
+    accuracy_m      DECIMAL(8, 2)  NULL COMMENT '定位精度，单位米',
+    speed_mps       DECIMAL(8, 2)  NULL,
+    bearing         DECIMAL(6, 2)  NULL COMMENT '朝向，0 至 360',
+    recorded_time   DATETIME       NOT NULL COMMENT '设备定位时间',
+    received_time   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '服务端接收时间',
+    updated_time    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_driver_location_driver FOREIGN KEY (driver_id) REFERENCES driver (id),
+    CONSTRAINT fk_driver_location_order FOREIGN KEY (active_order_id) REFERENCES ride_order (id),
+    KEY idx_driver_location_active_order (active_order_id),
+    KEY idx_driver_location_updated_time (updated_time)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+```
+
+默认即时叫车计价规则：
+
+```sql
+INSERT INTO pricing_rule
+    (name, version, status, is_default, base_fare, included_distance_m, minimum_fare)
+VALUES
+    ('默认即时叫车规则', 1, 'active', 1, 5.00, 2000, 5.00);
+
+SET @default_pricing_rule_id = LAST_INSERT_ID();
+
+INSERT INTO pricing_rule_tier
+    (rule_id, charge_type, range_start, range_end, unit_size, unit_price, rounding_mode, sort_no)
+VALUES
+    (@default_pricing_rule_id, 'DISTANCE', 0, 2000, 1000, 0.00, 'CEIL', 10),
+    (@default_pricing_rule_id, 'DISTANCE', 2000, 12000, 1000, 3.00, 'CEIL', 20),
+    (@default_pricing_rule_id, 'DISTANCE', 12000, NULL, 1000, 1.20, 'CEIL', 30),
+    (@default_pricing_rule_id, 'DRIVING_TIME', 0, 1800, 60, 0.20, 'CEIL', 10),
+    (@default_pricing_rule_id, 'DRIVING_TIME', 1800, NULL, 60, 0.50, 'CEIL', 20),
+    (@default_pricing_rule_id, 'WAITING_TIME', 0, 300, 60, 0.00, 'CEIL', 10),
+    (@default_pricing_rule_id, 'WAITING_TIME', 300, NULL, 60, 0.50, 'CEIL', 20);
+```

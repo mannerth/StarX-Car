@@ -38,6 +38,7 @@ import org.mannerth.starxcar.order.response.RideRouteContextResponse;
 import org.mannerth.starxcar.order.pricing.response.PricingRulePageResponse;
 import org.mannerth.starxcar.security.JwtService;
 import org.mannerth.starxcar.passenger.PassengerMapper;
+import org.mannerth.starxcar.passenger.Passenger;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +58,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
@@ -276,6 +278,47 @@ class StarXCarBackendApplicationTests {
         verify(driverMapper).updateById(driver);
         verify(userMapper).updateById(user);
         org.assertj.core.api.Assertions.assertThat(driver.getCarId()).isNull();
+        org.assertj.core.api.Assertions.assertThat(user.getStatus()).isEqualTo("cancelled");
+    }
+
+    @Test
+    void driverCancellationIsRejectedWhenAnOrderIsOngoing() throws Exception {
+        Driver driver = new Driver();
+        driver.setId(1L);
+        driver.setCarId(7L);
+        given(driverMapper.selectById(1L)).willReturn(driver);
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "存在进行中订单，请完成或取消后再注销账号"))
+                .when(driverWorkService).ensureNoOngoingOrders(1L);
+
+        mockMvc.perform(delete("/api/drivers/me")
+                        .header("Authorization", "Bearer " + driverToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409));
+
+        verify(driverCarBindingMapper, never()).update(any(), any());
+        verify(driverMapper, never()).updateById(any(Driver.class));
+        verify(userMapper, never()).updateById(any(User.class));
+    }
+
+    @Test
+    void passengerCancellationKeepsProfileAndOrderForeignKeyHistory() throws Exception {
+        Passenger passenger = new Passenger();
+        passenger.setId(1L);
+        User user = new User();
+        user.setId(1L);
+        user.setType(UserType.passenger);
+        user.setStatus("active");
+        given(passengerMapper.selectById(1L)).willReturn(passenger);
+        given(userMapper.selectById(1L)).willReturn(user);
+
+        mockMvc.perform(delete("/api/passengers/me")
+                        .header("Authorization", "Bearer " + passengerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0));
+
+        verify(passengerMapper, never()).deleteById(1L);
+        verify(userMapper, never()).deleteById(1L);
+        verify(userMapper).updateById(user);
         org.assertj.core.api.Assertions.assertThat(user.getStatus()).isEqualTo("cancelled");
     }
 

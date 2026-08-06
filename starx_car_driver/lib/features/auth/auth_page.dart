@@ -18,6 +18,7 @@ class _DriverAuthPageState extends ConsumerState<DriverAuthPage> {
   final _license = TextEditingController();
   final _realName = TextEditingController();
   bool _registering = false;
+  bool _submitting = false;
   String _gender = 'male';
   @override
   void dispose() {
@@ -36,6 +37,7 @@ class _DriverAuthPageState extends ConsumerState<DriverAuthPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitting = true);
     try {
       final auth = ref.read(driverAuthProvider.notifier);
       if (_registering) {
@@ -57,12 +59,14 @@ class _DriverAuthPageState extends ConsumerState<DriverAuthPage> {
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));
       }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final loading = ref.watch(driverAuthProvider).isLoading;
+    final loading = _submitting;
     return Scaffold(
       body: SafeArea(
         child: Center(

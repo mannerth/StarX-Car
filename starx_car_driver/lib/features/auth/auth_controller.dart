@@ -21,22 +21,21 @@ class DriverAuthController extends AsyncNotifier<AuthSession?> {
   Future<void> register(Map<String, Object> request) =>
       _authenticate('/auth/drivers/register', request);
   Future<void> _authenticate(String path, Map<String, Object> request) async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final data =
-          await ref.read(apiClientProvider).post(path, data: request)
-              as Map<String, dynamic>;
-      final user = data['user'] as Map<String, dynamic>;
-      if (user['type'] != 'driver') throw const ApiException('该账号不是司机账号。');
-      final session = AuthSession(
-        accessToken: data['accessToken'] as String,
-        refreshToken: data['refreshToken'] as String,
-        userId: (user['id'] as num).toInt(),
-        userType: 'driver',
-      );
-      await ref.read(sessionStoreProvider).save(session);
-      return session;
-    });
+    // Keep session restoration state stable while the auth page submits. The
+    // page owns the operation loading state and presents rethrown errors.
+    final data =
+        await ref.read(apiClientProvider).post(path, data: request)
+            as Map<String, dynamic>;
+    final user = data['user'] as Map<String, dynamic>;
+    if (user['type'] != 'driver') throw const ApiException('该账号不是司机账号。');
+    final session = AuthSession(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+      userId: (user['id'] as num).toInt(),
+      userType: 'driver',
+    );
+    await ref.read(sessionStoreProvider).save(session);
+    state = AsyncData(session);
   }
 
   Future<void> logout() async {

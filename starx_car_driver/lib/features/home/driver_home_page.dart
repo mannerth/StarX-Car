@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:starx_car_common/starx_car_common.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
 import 'driver_repository.dart';
+import '../work/driver_work_page.dart';
 
 const _plateProvinces = <String>[
   '京',
@@ -83,9 +83,6 @@ const _carColors = <String>[
   '橙色',
 ];
 
-final driverRepositoryProvider = Provider<DriverRepository>(
-  (ref) => DriverRepository(ref.read(apiClientProvider)),
-);
 final userProfileProvider = FutureProvider<UserProfile>((ref) {
   // Recreate data providers whenever a different driver session is restored
   // or established; otherwise Riverpod can retain a previous driver's data.
@@ -96,16 +93,16 @@ final driverProfileProvider = FutureProvider<Map<String, dynamic>>((ref) {
   ref.watch(driverAuthProvider);
   return ref.read(driverRepositoryProvider).getDriver();
 });
-final carProvider = FutureProvider<Map<String, dynamic>?>((ref) {
+final carsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) {
   ref.watch(driverAuthProvider);
-  return ref.read(driverRepositoryProvider).getCar();
+  return ref.read(driverRepositoryProvider).getCars();
 });
 
 class DriverHomePage extends ConsumerWidget {
   const DriverHomePage({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) => DefaultTabController(
-    length: 2,
+    length: 3,
     child: Scaffold(
       appBar: AppBar(
         title: const Text('司机工作台'),
@@ -117,12 +114,15 @@ class DriverHomePage extends ConsumerWidget {
         ],
         bottom: const TabBar(
           tabs: [
+            Tab(text: '听单'),
             Tab(text: '个人中心'),
             Tab(text: '我的车辆'),
           ],
         ),
       ),
-      body: const TabBarView(children: [DriverProfileTab(), CarTab()]),
+      body: const TabBarView(
+        children: [DriverWorkPage(), DriverProfileTab(), CarTab()],
+      ),
     ),
   );
 }
@@ -219,8 +219,48 @@ class DriverProfileTab extends ConsumerWidget {
           onPressed: () => _changePassword(context, ref),
           child: const Text('修改密码'),
         ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => _deleteAccount(context, ref),
+          icon: const Icon(Icons.person_off),
+          label: const Text('注销账号'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+        ),
       ],
     );
+  }
+
+  Future<void> _deleteAccount(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('确认注销账号？'),
+        content: const Text('注销后将无法登录，历史订单会保留，但账号不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确认注销'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(driverRepositoryProvider).deleteAccount();
+      await ref.read(driverAuthProvider.notifier).logout();
+    } on ApiException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
   }
 
   Future<void> _editBaseProfile(
@@ -326,54 +366,101 @@ class CarTab extends ConsumerWidget {
   const CarTab({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final car = ref.watch(carProvider);
-    if (car.isLoading) return const Center(child: CircularProgressIndicator());
-    if (car.hasError) return Center(child: Text('加载失败：${car.error}'));
-    final value = car.requireValue;
+    final driver = ref.watch(driverProfileProvider);
+    final cars = ref.watch(carsProvider);
+    if (driver.isLoading || cars.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (driver.hasError || cars.hasError) {
+      return Center(child: Text('加载失败：${driver.error ?? cars.error}'));
+    }
+    final currentCarId = (driver.requireValue['carId'] as num?)?.toInt();
+    final values = cars.requireValue;
+    final currentCar = values.cast<Map<String, dynamic>?>().firstWhere(
+      (car) => (car?['id'] as num?)?.toInt() == currentCarId,
+      orElse: () => null,
+    );
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (value == null)
-          const Text('尚未绑定车辆，创建后会自动绑定。')
-        else
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  title: const Text('车牌号'),
-                  subtitle: Text(
-                    '${value['plateProvince']}${value['plateLetter']}${value['plateSerial']}',
-                  ),
-                ),
-                ListTile(
-                  title: const Text('登记归属地'),
-                  subtitle: Text(
-                    value['registrationPlace'] as String? ?? '未填写',
-                  ),
-                ),
-                ListTile(
-                  title: const Text('核定载客数'),
-                  subtitle: Text('${value['seatCount'] ?? '—'} 人'),
-                ),
-                ListTile(
-                  title: const Text('品牌'),
-                  subtitle: Text(value['brand'] as String),
-                ),
-                ListTile(
-                  title: const Text('车型'),
-                  subtitle: Text(value['carType'] as String),
-                ),
-              ],
-            ),
-          ),
+        if (values.isEmpty) const Text('尚未绑定车辆，创建后会自动绑定。'),
+        for (final car in values) _carCard(context, ref, car, currentCarId),
         const SizedBox(height: 12),
         FilledButton.icon(
-          onPressed: () => _editCar(context, ref, value),
+          onPressed: () => _editCar(context, ref, currentCar),
           icon: const Icon(Icons.directions_car),
-          label: Text(value == null ? '创建并绑定车辆' : '修改绑定车辆'),
+          label: Text(currentCar == null ? '创建并绑定车辆' : '修改当前车辆'),
         ),
       ],
     );
+  }
+
+  Widget _carCard(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> car,
+    int? currentCarId,
+  ) {
+    final carId = (car['id'] as num?)?.toInt();
+    final isCurrent = carId != null && carId == currentCarId;
+    final plate = [
+      car['plateProvince'],
+      car['plateLetter'],
+      car['plateSerial'],
+    ].whereType<String>().join();
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(plate.isEmpty ? '未填写车牌' : plate),
+            subtitle: Text(
+              '${car['brand'] ?? '未知品牌'} ${car['carType'] ?? '未知车型'}',
+            ),
+            trailing: isCurrent
+                ? const Chip(label: Text('当前使用'))
+                : OutlinedButton(
+                    onPressed: carId == null
+                        ? null
+                        : () => _switchCurrentCar(context, ref, carId),
+                    child: const Text('切换'),
+                  ),
+          ),
+          ListTile(
+            dense: true,
+            title: const Text('登记归属地'),
+            subtitle: Text(car['registrationPlace'] as String? ?? '未填写'),
+          ),
+          ListTile(
+            dense: true,
+            title: const Text('核定载客数'),
+            subtitle: Text('${car['seatCount'] ?? '—'} 人'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _switchCurrentCar(
+    BuildContext context,
+    WidgetRef ref,
+    int carId,
+  ) async {
+    try {
+      await ref.read(driverRepositoryProvider).changeCurrentCar(carId);
+      ref.invalidate(driverProfileProvider);
+      ref.invalidate(carsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('当前车辆已切换')));
+      }
+    } on ApiException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
   }
 
   Future<void> _editCar(
@@ -450,7 +537,8 @@ class CarTab extends ConsumerWidget {
         await ref
             .read(driverRepositoryProvider)
             .saveCar(carData, (car?['id'] as num?)?.toInt());
-        ref.invalidate(carProvider);
+        ref.invalidate(driverProfileProvider);
+        ref.invalidate(carsProvider);
       },
     );
   }

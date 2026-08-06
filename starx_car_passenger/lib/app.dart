@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/auth_page.dart';
 import 'features/profile/profile_page.dart';
+import 'features/orders/passenger_orders_page.dart';
+import 'features/booking/booking_page.dart';
 
 class PassengerApp extends ConsumerWidget {
   const PassengerApp({super.key});
@@ -35,7 +37,51 @@ class _SessionGate extends ConsumerWidget {
           error: (error, stackTrace) => const PassengerAuthPage(),
           data: (session) => session == null
               ? const PassengerAuthPage()
-              : const PassengerProfilePage(),
+              : const PassengerHomePage(),
         );
   }
+}
+
+class PassengerHomePage extends StatefulWidget {
+  const PassengerHomePage({super.key});
+
+  @override
+  State<PassengerHomePage> createState() => _PassengerHomePageState();
+}
+
+class _PassengerHomePageState extends State<PassengerHomePage> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: IndexedStack(
+      index: _index,
+      children: const [
+        PassengerBookingPage(),
+        PassengerOrdersPage(),
+        PassengerProfilePage(),
+      ],
+    ),
+    bottomNavigationBar: NavigationBar(
+      selectedIndex: _index,
+      onDestinationSelected: (value) => setState(() => _index = value),
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.local_taxi_outlined),
+          selectedIcon: Icon(Icons.local_taxi),
+          label: '叫车',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.route_outlined),
+          selectedIcon: Icon(Icons.route),
+          label: '行程',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline),
+          selectedIcon: Icon(Icons.person),
+          label: '我的',
+        ),
+      ],
+    ),
+  );
 }

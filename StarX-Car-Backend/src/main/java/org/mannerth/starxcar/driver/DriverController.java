@@ -37,13 +37,15 @@ public class DriverController {
     private final UserMapper userMapper;
     private final CarMapper carMapper;
     private final DriverCarBindingMapper driverCarBindingMapper;
+    private final DriverWorkService driverWorkService;
 
     public DriverController(DriverMapper driverMapper, UserMapper userMapper, CarMapper carMapper,
-                            DriverCarBindingMapper driverCarBindingMapper) {
+                            DriverCarBindingMapper driverCarBindingMapper, DriverWorkService driverWorkService) {
         this.driverMapper = driverMapper;
         this.userMapper = userMapper;
         this.carMapper = carMapper;
         this.driverCarBindingMapper = driverCarBindingMapper;
+        this.driverWorkService = driverWorkService;
     }
 
     @GetMapping
@@ -153,12 +155,13 @@ public class DriverController {
     }
 
     @DeleteMapping
-    @Operation(summary = "注销司机账号", description = "将当前账号标记为 cancelled，解除当前用车并结束全部有效车辆绑定；保留司机资料和全部车辆绑定历史，账号不可恢复登录。")
-    @ApiResponses({@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "注销成功"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "非司机角色")})
+    @Operation(summary = "注销司机账号", description = "仅限 driver 角色；将当前账号标记为 cancelled，解除当前用车并结束全部有效车辆绑定，保留司机资料和全部车辆绑定历史。存在进行中订单时拒绝注销，避免订单悬空；账号不可恢复登录。")
+    @ApiResponses({@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "注销成功"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "非司机角色"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "司机或用户资料不存在"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "存在进行中订单，暂不能注销")})
     @Transactional
     public ApiResponse<Void> delete(@AuthenticationPrincipal String principal) {
         Long userId = CurrentUser.id(principal);
         Driver driver = requireDriver(userId);
+        driverWorkService.ensureNoOngoingOrders(driver.getId());
         deactivateBindings(driver.getId());
         driver.setCarId(null);
         driverMapper.updateById(driver);

@@ -88,6 +88,29 @@ class OrderCompletionServiceImplTests {
     }
 
     @Test
+    void truncatesCompletionTimeToTheDatabaseSecondPrecision() {
+        service = new OrderCompletionServiceImpl(orderMapper, fareItemMapper, eventMapper, driverMapper,
+                locationMapper, accessService, pricingRuleService, new FareCalculator(new PricingRuleValidator()),
+                Clock.fixed(Instant.parse("2026-08-05T02:30:01.900Z"), ZoneId.of("Asia/Shanghai")));
+        RideOrder order = inServiceOrder();
+        given(accessService.requireDriverOrder("O1", 2L)).willReturn(order);
+        given(pricingRuleService.getByIdAndVersion(1L, 1)).willReturn(PricingFixtures.defaultRule());
+        given(orderMapper.completeOrder(10L, 2L, 7L, NOW, 1801L, new BigDecimal("5.00"),
+                new BigDecimal("31.20"), new BigDecimal("6.50"), new BigDecimal("0.50"),
+                new BigDecimal("43.20"))).willReturn(1);
+        given(fareItemMapper.insertBatch(any())).willReturn(7);
+        given(eventMapper.insert(any(RideOrderEvent.class))).willReturn(1);
+        given(driverMapper.markOnlineIfBusy(2L)).willReturn(1);
+
+        OrderCompletionResponse result = service.complete(2L, "O1");
+
+        assertThat(result.completedTime()).isEqualTo(NOW);
+        verify(orderMapper).completeOrder(10L, 2L, 7L, NOW, 1801L, new BigDecimal("5.00"),
+                new BigDecimal("31.20"), new BigDecimal("6.50"), new BigDecimal("0.50"),
+                new BigDecimal("43.20"));
+    }
+
+    @Test
     void staleCompletionConditionDoesNotWriteFareItemsOrReleaseDriver() {
         RideOrder order = inServiceOrder();
         given(accessService.requireDriverOrder("O1", 2L)).willReturn(order);

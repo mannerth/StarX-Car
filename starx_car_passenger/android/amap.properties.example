@@ -1,0 +1,2 @@
+# Copy to android/amap.properties and replace with the passenger Android key.
+AMAP_ANDROID_KEY=

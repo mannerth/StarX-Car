@@ -8,11 +8,22 @@ import 'api_exception.dart';
 ///
 /// Business repositories stay in the passenger and driver applications.
 class ApiClient {
-  ApiClient({required String baseUrl, required SessionStore sessionStore})
-    : _store = sessionStore,
-      _dio = Dio(
-        BaseOptions(baseUrl: baseUrl, contentType: Headers.jsonContentType),
-      ) {
+  ApiClient({
+    required String baseUrl,
+    required SessionStore sessionStore,
+    Dio? dio,
+  }) : _store = sessionStore,
+       _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               baseUrl: baseUrl,
+               contentType: Headers.jsonContentType,
+               connectTimeout: const Duration(seconds: 10),
+               receiveTimeout: const Duration(seconds: 15),
+               sendTimeout: const Duration(seconds: 15),
+             ),
+           ) {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -51,17 +62,32 @@ class ApiClient {
   final SessionStore _store;
   Future<AuthSession?>? _refreshing;
 
-  Future<dynamic> get(String path) => _request(() => _dio.get<dynamic>(path));
-  Future<dynamic> post(String path, {Object? data}) =>
-      _request(() => _dio.post<dynamic>(path, data: data));
-  Future<dynamic> put(String path, {Object? data}) =>
-      _request(() => _dio.put<dynamic>(path, data: data));
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
+  }) => _request(
+    () => _dio.get<dynamic>(
+      path,
+      queryParameters: queryParameters,
+      cancelToken: cancelToken,
+    ),
+  );
+  Future<dynamic> post(String path, {Object? data, CancelToken? cancelToken}) =>
+      _request(
+        () => _dio.post<dynamic>(path, data: data, cancelToken: cancelToken),
+      );
+  Future<dynamic> put(String path, {Object? data, CancelToken? cancelToken}) =>
+      _request(
+        () => _dio.put<dynamic>(path, data: data, cancelToken: cancelToken),
+      );
   Future<dynamic> putMultipart(
     String path, {
     required Map<String, String> fields,
     List<int>? fileBytes,
     String? fileName,
     String fileField = 'avatar',
+    CancelToken? cancelToken,
   }) {
     final data = FormData.fromMap({
       ...fields,
@@ -75,16 +101,22 @@ class ApiClient {
           contentType: MultipartFile.lookupMediaType(fileName),
         ),
     });
-    return _request(() => _dio.put<dynamic>(path, data: data));
+    return _request(
+      () => _dio.put<dynamic>(path, data: data, cancelToken: cancelToken),
+    );
   }
-  Future<dynamic> delete(String path) =>
-      _request(() => _dio.delete<dynamic>(path));
+
+  Future<dynamic> delete(String path, {CancelToken? cancelToken}) =>
+      _request(() => _dio.delete<dynamic>(path, cancelToken: cancelToken));
 
   Future<dynamic> _request(Future<Response<dynamic>> Function() request) async {
     try {
       final response = await request();
       return _unwrap(response.data);
     } on DioException catch (error) {
+      if (error.type == DioExceptionType.cancel) {
+        throw const ApiException('请求已取消。', cancelled: true);
+      }
       final body = error.response?.data;
       if (body is Map<String, dynamic>) {
         throw ApiException(

@@ -52,13 +52,18 @@ public class PassengerController {
     }
 
     @DeleteMapping
-    @Operation(summary = "注销乘客账号", description = "删除当前乘客资料及对应用户账号，此操作不可恢复。")
-    @ApiResponses({@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "注销成功"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "非乘客角色")})
+    @Operation(summary = "注销乘客账号", description = "仅限 passenger 角色；将当前用户标记为 cancelled，保留乘客资料及历史订单关联，不再允许登录或刷新令牌。该操作不可恢复。")
+    @ApiResponses({@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "注销成功"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未登录或令牌无效"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "非乘客角色"), @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "乘客或用户资料不存在")})
     @Transactional
     public ApiResponse<Void> delete(@AuthenticationPrincipal String principal) {
         Long userId = CurrentUser.id(principal);
-        passengerMapper.deleteById(userId);
-        userMapper.deleteById(userId);
+        requirePassenger(userId);
+        var user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在");
+        }
+        user.setStatus("cancelled");
+        userMapper.updateById(user);
         return ApiResponse.success(null);
     }
 

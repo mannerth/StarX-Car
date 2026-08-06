@@ -159,6 +159,6 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private LocalDateTime now() {
-        return LocalDateTime.ofInstant(Instant.now(clock), BUSINESS_ZONE);
+        return LocalDateTime.ofInstant(Instant.now(clock), BUSINESS_ZONE).withNano(0);
     }
 }

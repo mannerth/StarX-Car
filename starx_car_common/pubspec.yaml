@@ -11,6 +11,13 @@ dependencies:
   flutter:
     sdk: flutter
   dio: ^5.9.0
+  amap_flutter_base:
+    path: ../third_party/amap_flutter_base
+  amap_flutter_map:
+    path: ../third_party/amap_flutter_map
+  amap_flutter_location:
+    path: ../third_party/amap_flutter_location
+  url_launcher: ^6.3.2
   # 9.x avoids the jni 1.x Android plugin, which requires a newer Gradle API
   # than the Flutter 3.44 Android template used by both mobile applications.
   flutter_secure_storage: ^9.2.4
@@ -31,6 +38,11 @@ dependency_overrides:
 
 # The following section is specific to Flutter packages.
 flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.mannerth.starxcar.common
+        pluginClass: StarxCarCommonPlugin
 
   # To add assets to your package, add an assets section, like this:
   # assets:

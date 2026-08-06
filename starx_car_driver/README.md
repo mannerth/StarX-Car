@@ -1,16 +1,17 @@
 # StarX-Car 司机端
 
-`starx_car_driver` 是 StarX-Car 的司机 Android App，依赖本地 `starx_car_common`。当前已完成司机账号、个人资料和当前绑定车辆管理；听单、订单和行程仍未实现。
+`starx_car_driver` 是 StarX-Car 的司机 Android App，依赖本地 `starx_car_common`。当前已完成司机账号、个人资料、车辆、听单工作台和进行中订单状态流转。
 
 ## 当前状态
 
-司机登录/注册、加密会话恢复、基础资料、司机资料、密码与车辆创建绑定功能均已对接后端。项目使用 Riverpod 管理会话；`flutter analyze`、`flutter test`、Android debug APK 构建均已通过。
+司机登录/注册、加密会话恢复、基础资料、司机资料、密码与车辆绑定功能均已对接后端；司机工作台已支持上线/下线、位置上报、待抢订单轮询、抢单、确认到达、开始服务和完成结算。抢单成功后会刷新已接订单并直接打开订单详情。进行中订单可进入详情页查看地图、上车点/目的地，并跳转高德外部导航；详情页和工作台快捷完成按钮都会展示服务端返回的实际时长、等待时长和最终金额。位置上报、待抢订单和已接订单查询会随任务生命周期取消在途请求，避免下线/退出后继续提交旧数据。项目使用 Riverpod 管理会话；`flutter analyze`、`flutter test`、Android debug APK 构建均已通过。认证 Controller 测试覆盖角色会话恢复、匹配登录保存和错误角色拒绝；Repository 契约测试覆盖当前车辆解析、GCJ-02 位置上报、WGS-84 拒绝和状态动作/完成账单。
 
 ## 已实现功能
 
 ### 认证与会话
 
 - 登录：`POST /api/auth/login`，只接受 `driver` 角色。
+- 登录提交期间保留表单内容；账号、密码或网络错误会在当前页面显示提示，不会重建页面或静默失败。
 - 注册：`POST /api/auth/drivers/register`，收集用户名、密码、邮箱、真实姓名、性别、手机号和驾驶证号；成功后直接登录。
 - 启动恢复会话，退出时清除安全存储；资料、司机资料和车辆 Provider 随会话切换自动重新加载；请求 Bearer Token、401 刷新、重放和错误处理均复用公共包。
 
@@ -20,13 +21,16 @@
 - 修改头像时从系统相册选择图片并随 `PUT /api/users/me` Multipart 表单提交，由后端上传并保存 URL；基础资料和司机资料仍分别使用对应接口更新。
 - 性别通过“男/女”选项选择；驾驶证有效期使用日期选择器；车辆出厂年份使用年份下拉选择，避免手输枚举值或日期格式。
 - 修改密码：`POST /api/users/me/password`。
+- 注销账号：个人中心二次确认后调用 `DELETE /api/drivers/me`；服务端保留司机资料、车辆绑定和历史订单并标记账号 `cancelled`，存在进行中订单时会返回 409，成功后清理本地会话。
 - 所有编辑弹窗为 Stateful 组件，自身持有并在卸载时释放 `TextEditingController`；保存/取消时输入框仍有焦点不会卡死。
 
 ### 当前绑定车辆
 
-- 未绑定时填写行驶证号、拆分车牌、登记归属地、核定载客数、出厂年份、车型和品牌，调用 `POST /api/cars` 创建并自动绑定；车牌省份简称、车牌字母及颜色使用固定下拉选项，避免提交不规范值。
-- 已绑定时按拆分车牌展示完整车牌号，并调用 `PUT /api/cars/{carId}` 修改车辆。
-- 未实现解绑、删除车辆与绑定既有车辆的独立页面，尽管后端已有相关接口。
+- 车辆页加载司机全部有效绑定车辆，使用 `driver.carId` 标记当前使用车辆；一名司机可保留多辆绑定车辆。
+- 对非当前车辆提供“切换”操作，调用 `PUT /api/drivers/me/current-car`；切换只改变当前指针，不改变绑定历史。
+- 未绑定时填写行驶证号、拆分车牌、登记归属地、核定载客数、出厂年份、车型和品牌，调用 `POST /api/cars` 创建并自动设为当前车辆；车牌省份简称、车牌字母及颜色使用固定下拉选项，避免提交不规范值。
+- 当前车辆支持调用 `PUT /api/cars/{carId}` 修改；其他绑定车辆先切换为当前车辆后再编辑。
+- 尚未提供解绑/停用车辆入口；后端相关接口保留给后续确认后的车辆管理流程。
 
 ## 工程结构
 
@@ -38,8 +42,11 @@ lib/
   features/
     auth/                           Riverpod 认证控制器与登录/注册表单
     home/
-      driver_repository.dart        用户、司机资料与车辆 API
-      driver_home_page.dart         工作台、资料页、车辆页、编辑弹窗
+        driver_repository.dart        用户、司机资料与车辆 API
+        driver_home_page.dart         工作台、资料页、车辆页、编辑弹窗
+      work/
+        driver_work_page.dart         上下线、抢单和进行中订单
+        driver_order_detail_page.dart 订单地图、导航和状态操作
 ```
 
 依赖方向固定为 `starx_car_driver -> starx_car_common`。司机工作流、车辆与位置上报策略不会放入公共包。
@@ -53,18 +60,31 @@ lib/
 | `GET` / `PUT` | `/api/users/me` | 当前基础资料 |
 | `POST` | `/api/users/me/password` | 修改密码 |
 | `GET` / `PUT` | `/api/drivers/me` | 司机手机号、驾驶证资料 |
-| `GET` | `/api/cars/me` | 获取当前绑定车辆；未绑定为 404 |
-| `POST` | `/api/cars` | 创建并自动绑定车辆 |
-| `PUT` | `/api/cars/{carId}` | 修改当前绑定车辆 |
+| `DELETE` | `/api/drivers/me` | 注销司机账号并保留历史记录 |
+| `GET` | `/api/drivers/me/cars` | 获取全部有效绑定车辆 |
+| `PUT` | `/api/drivers/me/current-car` | 从本人绑定车辆中切换当前车辆 |
+| `PUT` | `/api/drivers/me/work-status` | 上线或下线 |
+| `PUT` | `/api/drivers/me/location` | 上报最新 GCJ-02 位置 |
+| `GET` | `/api/drivers/me/orders/pending` | 查询待抢订单 |
+| `GET` | `/api/drivers/me/orders` | 查询已接订单 |
+| `GET` | `/api/orders/{orderNo}` | 查询司机自己的订单详情 |
+| `POST` | `/api/orders/{orderNo}/accept` | 抢单 |
+| `POST` | `/api/orders/{orderNo}/arrive` | 确认到达 |
+| `POST` | `/api/orders/{orderNo}/start-service` | 开始服务 |
+| `POST` | `/api/orders/{orderNo}/complete` | 完成并结算 |
 
 ## Android 配置、运行与验证
 
 - application ID：`org.mannerth.starxcar.driver`。
+- 跨角色接口字段、状态机、错误码和坐标约定见仓库根目录的 [`docs/client-api-contract.md`](../docs/client-api-contract.md)。
 - 默认后端地址：`http://10.0.2.2:8080/api`；可通过 `--dart-define=API_BASE_URL=...` 覆盖。
+- 高德 Android Key 配置在本项目 `android/amap.properties` 的 `AMAP_ANDROID_KEY`；该文件已忽略且不能提交。`--dart-define` 只用于 API 地址，不能替代原生清单 Key。
 - 本地开发允许 HTTP，生产必须改用 HTTPS。
 - 因工程位于 D 盘、Flutter Pub 缓存位于 C 盘，已关闭 Kotlin 增量编译并使用进程内编译，避免 `image_picker_android` 的跨盘缓存错误；首次 Android 构建会稍慢。
 - 未配置 `android/key.properties` 时仍可构建 debug APK；配置本机 release 签名后 release 构建会自动使用它。
 - 签名文件和 `key.properties` 均不可提交、删除或分享。
+- release 签名路径从 Android 项目根目录解析，当前本机配置可使用仓库根目录 `android-signing/starx-car-release.jks` 构建；APK 证书 SHA-1 为 `4C:83:43:EE:4B:E8:5E:0B:89:7A:29:E9:83:D8:17:C1:9A:0C:BF:73`，须在高德控制台登记到司机端 Key。
+- 当前本机 debug APK 证书 SHA-1 为 `1C:50:46:29:AE:A7:92:22:36:9C:CB:83:B7:E7:53:D1:1B:AE:D8:28`；若出现高德 `INVALID_USER_SCODE`，先确认司机端 Key 的 Android 包名为本行 application ID，并同时登记实际构建签名的 SHA-1。
 
 ```powershell
 cd starx_car_driver
@@ -73,11 +93,23 @@ fvm flutter analyze
 fvm flutter test
 fvm flutter run
 fvm flutter build apk --debug
+# 连接 Android 真机后运行启动级集成测试
+ fvm flutter test integration_test/app_start_test.dart
+ fvm flutter test integration_test/amap_map_test.dart -d <android-device> # 需要已配置高德 Key
+ fvm flutter test integration_test/foreground_service_test.dart -d <android-device> # 需要授予定位和通知权限
+ fvm flutter test --dart-define=API_BASE_URL=http://127.0.0.1:1/api integration_test/auth_error_test.dart -d <android-device>
 ```
+
+本次验证：`fvm flutter analyze`、`fvm flutter test`、`fvm flutter build apk --debug` 均通过；启动级 integration test 已在 `Pixel 9 Pro (Android 16/API 36)` 安装运行并通过。清单已注入非空高德 Key，但模拟器日志报告 `INVALID_USER_SCODE`，因此地图 Key 的控制台包名/SHA-1 配置仍未验收通过；定位权限、GPS 和前台服务仍需继续实测。
+
+若出现“older Android embedding”并提示缺少 `android/AndroidManifest.xml`，说明使用了系统全局 Flutter。请在本模块目录执行 `fvm flutter ...`；本工程已使用 Android embedding v2，不能通过新增根级 Manifest 修复该提示。
+
+## Android 前台服务
+
+- 司机上线时会启动 `DriverForegroundService`，显示“正在听单并上报位置”的常驻通知；下线、登出或服务销毁时停止。
+- Android 13+ 需要允许通知，Android 14+ 需要允许前台定位服务和定位权限；缺少权限时不会把服务端工作状态切为在线。
+- 断网退避、权限引导和前台服务行为仍需在 Android 真机上验证。
 
 ## 尚未实现
 
-- 出车/收车、听单、待接订单列表、接单/拒单。
-- 到达、开始服务、结束服务等行程状态。
-- 地图、接驾/送驾导航、按订单状态的位置上报与断网重试。
-- 订单历史、收入、评价。
+- 订单历史分页、收入、支付和评价。

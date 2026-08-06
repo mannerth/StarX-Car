@@ -1,5 +1,25 @@
 ## Unreleased
 
+- 增加 `AmapLocationService.locateOnce` 一次性定位能力，供乘客端选择当前位置；仍由角色端负责权限错误展示和生命周期释放。
+
+- 为公共 `ApiClient` 增加所有请求方法的可选 `CancelToken`，主动取消统一映射为 `ApiException.cancelled`，并补充取消请求测试；角色端无需直接依赖 Dio 即可使用 common 导出的 `CancelToken`。
+
+- Add offline `ApiClient` tests for Bearer injection, response-envelope errors, single-flight concurrent 401 refresh/replay, and session cleanup after refresh failure.
+
+- Preserve server order events in the role-neutral order-detail model, including raw event/operator values for forward-compatible timeline display.
+
+- Add the shared client API contract covering authentication, passenger/driver orders, vehicle binding, GCJ-02 locations, status transitions and known backend contract gaps.
+
+- Add GCJ-02 route polyline support to `AmapMapView`, an external AMap driving-navigation hand-off, and the role-neutral `OrderCompletionResult` settlement model.
+- Pass the required AMap privacy declaration to map widgets and preserve raw location failures/accuracy metadata for role-specific handling.
+- Add an Android MethodChannel bridge for official AMap driving routes, nearby POI search and reverse geocoding; all returned coordinates remain explicitly GCJ-02.
+
+- Vendor and migrate the AMap map/base/location plugins for Flutter 3.44, and expose common `AmapMapView`/`AmapLocationService` wrappers with GCJ-02 enforcement.
+
+
+- Add role-neutral order, fare, pagination, driver-location and route-context models. Decimal fare fields remain strings to avoid client-side floating-point rounding, unknown order states map to a safe fallback, and location models preserve the server `stale` flag.
+- Add Dio connect/send/receive timeouts for mobile requests and model contract tests covering missing drivers, stale locations, GCJ-02 coordinates and unknown states.
+
 - `ApiClient.putMultipart` 现在按文件名推导 multipart 图片 MIME 类型，修复 `MultipartFile.fromBytes` 默认 `application/octet-stream` 被后端图片校验拒绝的问题。
 - 刷新令牌请求标记为跳过 Bearer 拦截器，避免把即将失效的 access token 附加到 `/auth/refresh`。
 

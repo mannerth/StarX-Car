@@ -41,24 +41,25 @@ class PassengerAuthController extends AsyncNotifier<AuthSession?> {
   }
 
   Future<void> _authenticate(String path, Map<String, Object> request) async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final data =
-          await ref.read(apiClientProvider).post(path, data: request)
-              as Map<String, dynamic>;
-      final user = data['user'] as Map<String, dynamic>;
-      if (user['type'] != 'passenger') {
-        throw const ApiException('该账号不是乘客账号。');
-      }
-      final session = AuthSession(
-        accessToken: data['accessToken'] as String,
-        refreshToken: data['refreshToken'] as String,
-        userId: (user['id'] as num).toInt(),
-        userType: 'passenger',
-      );
-      await ref.read(sessionStoreProvider).save(session);
-      return session;
-    });
+    // Authentication is an operation on the login page, not a session
+    // restoration. Keeping the provider as AsyncData(null) while the request
+    // is in flight prevents the SessionGate from destroying the form. Errors
+    // are deliberately rethrown so the page can present the API message.
+    final data =
+        await ref.read(apiClientProvider).post(path, data: request)
+            as Map<String, dynamic>;
+    final user = data['user'] as Map<String, dynamic>;
+    if (user['type'] != 'passenger') {
+      throw const ApiException('该账号不是乘客账号。');
+    }
+    final session = AuthSession(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+      userId: (user['id'] as num).toInt(),
+      userType: 'passenger',
+    );
+    await ref.read(sessionStoreProvider).save(session);
+    state = AsyncData(session);
   }
 
   Future<void> logout() async {

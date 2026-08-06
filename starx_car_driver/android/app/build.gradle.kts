@@ -3,9 +3,14 @@ import java.util.Properties
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
+val amapProperties = Properties()
+val amapPropertiesFile = rootProject.file("amap.properties")
 
 if (keystorePropertiesFile.exists()) {
     FileInputStream(keystorePropertiesFile).use(keystoreProperties::load)
+}
+if (amapPropertiesFile.exists()) {
+    FileInputStream(amapPropertiesFile).use(amapProperties::load)
 }
 
 plugins {
@@ -32,13 +37,16 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["AMAP_ANDROID_KEY"] = amapProperties.getProperty("AMAP_ANDROID_KEY", "")
     }
 
     if (keystorePropertiesFile.exists()) {
         signingConfigs.create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias")
             keyPassword = keystoreProperties.getProperty("keyPassword")
-            storeFile = file(keystoreProperties.getProperty("storeFile"))
+            // Resolve the configured path from the Android project root, so a
+            // shared repository-level keystore can be referenced consistently.
+            storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
             storePassword = keystoreProperties.getProperty("storePassword")
         }
     }
@@ -50,6 +58,14 @@ android {
             }
         }
     }
+}
+
+dependencies {
+    // The vendored Flutter wrappers declare these as compileOnly; the app
+    // must package the official AMap Android SDKs at runtime.
+    implementation("com.amap.api:3dmap:8.1.0")
+    implementation("com.amap.api:location:5.6.0")
+    implementation("com.amap.api:search:9.7.0")
 }
 
 kotlin {

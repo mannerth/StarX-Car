@@ -20,4 +20,18 @@ class Place {
 
   /// AMap POI identifier, when the place originates from a POI search.
   final String? amapPoiId;
+
+  /// Converts the selected GCJ-02 place to the backend request shape.
+  Map<String, dynamic> toJson() {
+    if (location.coordinateSystem != CoordinateSystem.gcj02) {
+      throw StateError('只有 GCJ-02 坐标可以提交给业务接口。');
+    }
+    return {
+      if (amapPoiId != null && amapPoiId!.isNotEmpty) 'poiId': amapPoiId,
+      'name': name,
+      if (address != null && address!.isNotEmpty) 'address': address,
+      'latitude': location.latitude,
+      'longitude': location.longitude,
+    };
+  }
 }

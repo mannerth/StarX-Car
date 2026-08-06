@@ -123,7 +123,7 @@ public class OrderCompletionServiceImpl implements OrderCompletionService {
     }
 
     private LocalDateTime now() {
-        return LocalDateTime.ofInstant(Instant.now(clock), BUSINESS_ZONE);
+        return LocalDateTime.ofInstant(Instant.now(clock), BUSINESS_ZONE).withNano(0);
     }
 
     private ResponseStatusException conflict(String reason) {

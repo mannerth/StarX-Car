@@ -72,6 +72,16 @@ public class DriverWorkService {
         return driver;
     }
 
+    /**
+     * Ensures account cancellation cannot strand an order that still needs the
+     * driver's state transitions or final settlement.
+     */
+    public void ensureNoOngoingOrders(Long driverId) {
+        if (ongoingOrderCount(driverId) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "存在进行中订单，请完成或取消后再注销账号");
+        }
+    }
+
     public void reportLocation(Long driverId, DriverLocationRequest request) {
         Driver driver = requireActiveDriver(driverId);
         if (!"online".equals(driver.getWorkStatus()) && !"busy".equals(driver.getWorkStatus())) {
@@ -137,6 +147,6 @@ public class DriverWorkService {
     }
 
     private LocalDateTime now() {
-        return LocalDateTime.ofInstant(Instant.now(clock), BUSINESS_ZONE);
+        return LocalDateTime.ofInstant(Instant.now(clock), BUSINESS_ZONE).withNano(0);
     }
 }

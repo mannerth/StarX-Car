@@ -1,0 +1,25 @@
+group 'com.mannerth.starxcar.common'
+version '1.0'
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'com.mannerth.starxcar.common'
+    compileSdk 36
+
+    defaultConfig {
+        minSdkVersion 21
+    }
+}
+
+dependencies {
+    // The consuming apps package the SDK at runtime; this dependency only
+    // supplies the route-search API while compiling the common plugin.
+    compileOnly 'com.amap.api:search:9.7.0'
+    compileOnly 'com.amap.api:3dmap:8.1.0'
+}

@@ -10,20 +10,16 @@ import 'passenger_repository.dart';
 final passengerRepositoryProvider = Provider<PassengerRepository>(
   (ref) => PassengerRepository(ref.read(apiClientProvider)),
 );
-final passengerProfileProvider = FutureProvider<UserProfile>(
-  (ref) {
-    // Tie cached profile data to the active session. Without this dependency,
-    // logging out and then in as another passenger can show the prior account.
-    ref.watch(passengerAuthProvider);
-    return ref.read(passengerRepositoryProvider).getProfile();
-  },
-);
-final passengerDetailProvider = FutureProvider<Map<String, dynamic>>(
-  (ref) {
-    ref.watch(passengerAuthProvider);
-    return ref.read(passengerRepositoryProvider).getPassengerProfile();
-  },
-);
+final passengerProfileProvider = FutureProvider<UserProfile>((ref) {
+  // Tie cached profile data to the active session. Without this dependency,
+  // logging out and then in as another passenger can show the prior account.
+  ref.watch(passengerAuthProvider);
+  return ref.read(passengerRepositoryProvider).getProfile();
+});
+final passengerDetailProvider = FutureProvider<Map<String, dynamic>>((ref) {
+  ref.watch(passengerAuthProvider);
+  return ref.read(passengerRepositoryProvider).getPassengerProfile();
+});
 
 class PassengerProfilePage extends ConsumerWidget {
   const PassengerProfilePage({super.key});
@@ -129,8 +125,48 @@ class _ProfileContent extends ConsumerWidget {
           icon: const Icon(Icons.password),
           label: const Text('修改密码'),
         ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => _deleteAccount(context, ref),
+          icon: const Icon(Icons.person_off),
+          label: const Text('注销账号'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+        ),
       ],
     );
+  }
+
+  Future<void> _deleteAccount(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('确认注销账号？'),
+        content: const Text('注销后将无法登录，历史行程会保留，但账号不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确认注销'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(passengerRepositoryProvider).deleteAccount();
+      await ref.read(passengerAuthProvider.notifier).logout();
+    } on ApiException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
   }
 
   Future<void> _editPhone(

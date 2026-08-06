@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-公共认证与网络基础设施已经可供两个 Android App 使用；地图部分目前只有坐标和地点模型，尚未接入高德 SDK。包级静态检查和单元测试均已通过。
+公共认证、网络基础设施和高德 Android 地图/定位/驾车路线适配已经可供两个 Android App 使用；订单展示模型、GCJ-02 校验、高德外部导航、POI 搜索和逆地理编码均已加入 common。订单流程仍由角色端实现。包级静态检查和单元测试均已通过。
 
 ## 已实现能力
 
@@ -22,15 +22,25 @@
 - `ApiClient` 基于 Dio，统一使用后端 `/api` 响应信封，成功时返回 `data` 字段。
 - `ApiClient.putMultipart`：统一发送带 Bearer Token 的 Multipart 请求；根据文件名推导图片 MIME 类型，确保头像文件能通过后端类型校验；乘客端和司机端不直接访问图床服务。
 - 每个请求自动读取安全会话并附加 `Authorization: Bearer <accessToken>`。
+- `get`、`post`、`put`、`delete` 和 `putMultipart` 均支持可选的 `CancelToken`；调用方取消后统一收到 `ApiException.cancelled == true`，页面可安全忽略该结果。
 - 收到业务请求的 `401` 时，使用 refresh token 请求 `/auth/refresh`；刷新请求不会附带旧 access token，同一时刻的多个 `401` 合并为一次刷新请求，刷新成功后自动重放原请求。
 - 刷新失败或不存在会话时清除本地会话；调用方可据此返回登录页。
-- `ApiException` 只保留可展示的服务端消息、HTTP 状态和 trace ID，不暴露底层异常详情。
+- `ApiException` 只保留可展示的服务端消息、HTTP 状态、trace ID 和是否由调用方取消，不暴露底层异常详情。
 
 ### 通用模型
 
 - `ApiResponse<T>`：对应后端 `{ code, message, traceId, data }` 信封。
 - `GeoPoint`、`CoordinateSystem`、`Place`：为后续地图与地点选择提供基础类型。
 - 高德业务坐标统一按 `GCJ-02` 使用；设备 GPS 的 `WGS-84` 必须在地图基础层明确转换或标注，业务端不得混用。
+- `OrderStatus`、`FareQuote`、`OrderQuote`、`OrderSummary`、`OrderPage`、`OrderDetail`、`OrderEvent`、`OrderCompletionResult`、`DriverLocation` 和 `RouteContext`：只负责解析跨角色订单展示字段；金额保留十进制字符串，位置模型保留 `stale` 标志，订单事件枚举保留原始字符串以兼容服务端扩展。
+
+### 高德 Android 基础能力
+
+- 本地 vendor 的 `amap_flutter_map`、`amap_flutter_location` 和 `amap_flutter_base` 适配 Flutter 3.44；底层仍使用高德官方 Android SDK。
+- `AmapMapView` 接受 GCJ-02 标记和可选路线折线；`AmapLocationService` 支持持续定位流和一次性当前位置请求。
+- `AmapNavigationService` 只负责打开已安装的高德地图进行驾车导航，调用方负责订单状态和位置上报策略。
+- `AmapRouteService` 通过官方 Android 路线 SDK 返回距离、时长和 GCJ-02 折线；不使用 Web Service Key。
+- `AmapSearchService` 支持以当前位置为中心的 POI 搜索和逆地理编码，结果转换为 `Place`。
 
 ## 职责边界
 
@@ -48,9 +58,14 @@ starx_car_driver ────┘
 
 - `dio`：HTTP 传输。
 - `flutter_secure_storage 9.2.4`：Android Keystore 安全存储。
+- `url_launcher 6.3.2`：打开高德地图外部导航 URI。
+- Android app 显式打包高德 `3dmap:8.1.0`、`location:5.6.0` 和 `search:9.7.0` 官方 SDK；Flutter wrapper 的 `compileOnly` 声明不会替代运行时依赖。
 - `path_provider_android 2.2.22`：在包与两个 App 中固定该版本，避免新版本引入的 `jni` Android Gradle 插件与当前 Flutter 3.44 Gradle 模板冲突。
 
 ## 使用与验证
+
+跨角色后端字段、状态机、错误码和坐标约定见仓库根目录的
+[`docs/client-api-contract.md`](../docs/client-api-contract.md)。
 
 ```yaml
 dependencies:
@@ -67,6 +82,6 @@ fvm flutter test
 
 ## 尚未实现
 
-- 高德 Android 地图、定位权限、POI、逆地理编码、路线规划与外部导航。
+- 高德 POI、逆地理编码和路线搜索的更多策略（当前已支持基础搜索、逆地理编码和驾车路线）。
 - WebSocket 的连接、重连、心跳和通用事件信封。
 - 分页及更多跨角色展示模型。

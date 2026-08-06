@@ -1,0 +1,25 @@
+group 'com.amap.flutter.amap_flutter_map'
+version '1.0'
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'com.amap.flutter.map'
+    compileSdk 36
+
+    defaultConfig {
+        minSdkVersion 16
+    }
+    lint {
+        disable 'InvalidPackage'
+    }
+}
+
+dependencies {
+    compileOnly 'com.amap.api:3dmap:8.1.0'
+}

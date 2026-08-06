@@ -19,6 +19,7 @@ class _PassengerAuthPageState extends ConsumerState<PassengerAuthPage> {
   final _phone = TextEditingController();
   final _realName = TextEditingController();
   bool _isRegistering = false;
+  bool _submitting = false;
   String _gender = 'male';
 
   @override
@@ -33,6 +34,7 @@ class _PassengerAuthPageState extends ConsumerState<PassengerAuthPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitting = true);
     try {
       final controller = ref.read(passengerAuthProvider.notifier);
       if (_isRegistering) {
@@ -52,6 +54,8 @@ class _PassengerAuthPageState extends ConsumerState<PassengerAuthPage> {
       }
     } on ApiException catch (error) {
       if (mounted) _showError(error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -63,7 +67,7 @@ class _PassengerAuthPageState extends ConsumerState<PassengerAuthPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = ref.watch(passengerAuthProvider).isLoading;
+    final isLoading = _submitting;
     return Scaffold(
       body: SafeArea(
         child: Center(

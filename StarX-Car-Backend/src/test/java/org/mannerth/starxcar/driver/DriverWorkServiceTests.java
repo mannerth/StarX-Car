@@ -120,6 +120,20 @@ class DriverWorkServiceTests {
     }
 
     @Test
+    void driverWithOngoingOrderCannotCancelAccount() {
+        given(rideOrderMapper.selectCount(any())).willReturn(1L);
+
+        assertConflict(() -> service.ensureNoOngoingOrders(1L));
+    }
+
+    @Test
+    void driverWithoutOngoingOrderCanCancelAccount() {
+        given(rideOrderMapper.selectCount(any())).willReturn(0L);
+
+        service.ensureNoOngoingOrders(1L);
+    }
+
+    @Test
     void offlineDriverCannotReportLocation() {
         given(driverMapper.selectById(1L)).willReturn(activeDriver("offline", 7L));
         given(userMapper.selectById(1L)).willReturn(activeUser());

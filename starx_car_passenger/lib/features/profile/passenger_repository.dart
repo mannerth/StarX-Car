@@ -16,6 +16,10 @@ class PassengerRepository {
     await _apiClient.put('/passengers/me', data: {'phoneNumber': phoneNumber});
   }
 
+  Future<void> deleteAccount() async {
+    await _apiClient.delete('/passengers/me');
+  }
+
   Future<UserProfile> updateProfile({
     required String username,
     required String email,
@@ -23,18 +27,20 @@ class PassengerRepository {
     required String realName,
     XFile? avatar,
   }) async {
-    final data = await _apiClient.putMultipart(
-          '/users/me',
-          fields: {
-            'username': username,
-            'email': email,
-            'gender': gender,
-            'realName': realName,
-            'avatarUrl': '',
-          },
-          fileBytes: avatar == null ? null : await avatar.readAsBytes(),
-          fileName: avatar?.name,
-        ) as Map<String, dynamic>;
+    final data =
+        await _apiClient.putMultipart(
+              '/users/me',
+              fields: {
+                'username': username,
+                'email': email,
+                'gender': gender,
+                'realName': realName,
+                'avatarUrl': '',
+              },
+              fileBytes: avatar == null ? null : await avatar.readAsBytes(),
+              fileName: avatar?.name,
+            )
+            as Map<String, dynamic>;
     return UserProfile.fromJson(data);
   }
 

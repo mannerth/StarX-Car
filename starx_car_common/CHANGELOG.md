@@ -1,5 +1,9 @@
 ## Unreleased
 
+- 修复内置 `amap_flutter_map` 在地图加载完成时主动读取空数组、导致每次首次启动固定抛出 `ArrayIndexOutOfBoundsException` 的问题。
+- 将高德定位 SDK 从 5.6.0 升级到仍支持 x86_64 模拟器的 6.5.1，纳入新版 Android 的合规与兼容修复。
+- 关闭定位请求中未使用的地址解析，避免一次性当前位置额外触发逆地理编码鉴权和配额消耗；地点名称仍由独立的搜索/逆地理编码能力按需获取。
+
 - 增加 `AmapLocationService.locateOnce` 一次性定位能力，供乘客端选择当前位置；仍由角色端负责权限错误展示和生命周期释放。
 
 - 为公共 `ApiClient` 增加所有请求方法的可选 `CancelToken`，主动取消统一映射为 `ApiException.cancelled`，并补充取消请求测试；角色端无需直接依赖 Dio 即可使用 common 导出的 `CancelToken`。

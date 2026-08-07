@@ -86,11 +86,13 @@ lib/
 - 跨角色接口字段、状态机、错误码和坐标约定见仓库根目录的 [`docs/client-api-contract.md`](../docs/client-api-contract.md)。
 - 默认 API 地址：`http://10.0.2.2:8080/api`，适用于 Android 模拟器访问本机后端；也可用 `--dart-define=API_BASE_URL=http://<host>:<port>/api` 覆盖。
 - 高德 Android Key 配置在本项目 `android/amap.properties` 的 `AMAP_ANDROID_KEY`；该文件已忽略且不能提交。`--dart-define` 只用于 API 地址，不能替代原生清单 Key。
+- Android 主清单已声明高德地图和一次性前台定位需要的网络、网络状态、Wi-Fi 状态、粗略/精确位置与 A-GPS 权限，并注册独立的 `APSService` 定位服务；这些配置同时适用于 debug 和 release 构建，不申请后台定位。
 - 为本地 HTTP 开发已允许 Android 明文流量；部署环境必须使用 HTTPS。
 - 因工程位于 D 盘、Flutter Pub 缓存位于 C 盘，已关闭 Kotlin 增量编译并使用进程内编译，避免 `image_picker_android` 的跨盘缓存错误；首次 Android 构建会稍慢。
 - `android/key.properties` 与 release keystore 均为本机敏感文件，已忽略，不能提交或分享。
 - release 签名路径从 Android 项目根目录解析，当前本机配置可使用仓库根目录 `android-signing/starx-car-release.jks` 构建；APK 证书 SHA-1 为 `4C:83:43:EE:4B:E8:5E:0B:89:7A:29:E9:83:D8:17:C1:9A:0C:BF:73`，须在高德控制台登记到乘客端 Key。
 - 当前本机 debug APK 证书 SHA-1 为 `1C:50:46:29:AE:A7:92:22:36:9C:CB:83:B7:E7:53:D1:1B:AE:D8:28`；若出现高德 `INVALID_USER_SCODE`，先确认乘客端 Key 的 Android 包名为本行 application ID，并同时登记实际构建签名的 SHA-1。
+- 若日志中的 `SHA1Package` 与上述 debug SHA-1/包名一致，却同时出现 `SERVICE_NOT_EXIST` 与 `INSUFFICIENT_ABROAD_PRIVILEGES`，应先确认运行包已使用当前 6.x 定位 SDK，而不是继续修改 SHA-1。美国运营商环境的 x86_64 模拟器仍可能打印一条非阻断的内部鉴权日志；验收标准是页面不显示 Key 错误遮罩、地图出现当前位置且上车点成功选中。
 
 ```powershell
 cd starx_car_passenger
@@ -104,7 +106,7 @@ fvm flutter build apk --debug
 fvm flutter test integration_test/app_start_test.dart
 ```
 
-本次验证：`fvm flutter analyze`、`fvm flutter test`、`fvm flutter build apk --debug` 均通过；启动级 integration test 和高德地图 Widget 挂载测试已在 `Pixel 9 Pro (Android 16/API 36)` 安装运行并通过。清单已注入非空高德 Key，但模拟器日志报告 `INVALID_USER_SCODE`，因此地图 Key 的控制台包名/SHA-1 配置仍未验收通过。
+本次排查确认本机 Key 已注入，运行 APK 上报的 debug SHA-1 和包名与高德控制台填写值一致。Android 清单已补齐地图/定位网络权限，内置地图插件也不再在地图加载完成时人为触发空数组异常；定位 SDK 已从 5.6.0 升级到仍支持 x86_64 模拟器的 6.5.1。已在 `Pixel 9 Pro (Android 16/API 36)` 美国运营商模拟器复测：Key 错误遮罩消失、当前位置蓝点可见且上车点成功选中；模拟器仍会打印一条不影响坐标返回的 `SERVICE_NOT_EXIST` 内部日志。
 
 若出现“older Android embedding”并提示缺少 `android/AndroidManifest.xml`，说明使用了系统全局 Flutter。请在本模块目录执行 `fvm flutter ...`；本工程已使用 Android embedding v2，不能通过新增根级 Manifest 修复该提示。
 

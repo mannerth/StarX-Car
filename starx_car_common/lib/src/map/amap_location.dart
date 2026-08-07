@@ -80,7 +80,7 @@ class AmapLocationService {
       AMapLocationOption()
         ..onceLocation = true
         ..locationInterval = 1000
-        ..needAddress = true,
+        ..needAddress = false,
     );
     _plugin.startLocation();
     try {
@@ -95,7 +95,7 @@ class AmapLocationService {
       AMapLocationOption()
         ..onceLocation = false
         ..locationInterval = interval.inMilliseconds
-        ..needAddress = true,
+        ..needAddress = false,
     );
     _plugin.startLocation();
   }

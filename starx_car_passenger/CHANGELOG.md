@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- 恢复 Android Flutter/Gradle 忽略规则，停止追踪 Gradle wrapper、原生生成注册器和构建报告；本机高德 Key、SDK 路径、签名配置与缓存继续保留在工作区但不进入 Git。
+
+- 修复乘客端高德地图启动时缺少 `ACCESS_NETWORK_STATE` 等权限导致的 `SecurityException`；网络、Wi-Fi、前台定位和 A-GPS 权限及 `APSService` 现在统一声明在主清单，对 debug/release 均生效且不申请后台定位。
+- 核对运行 APK 的 debug SHA-1、包名和注入 Key 与高德控制台配置一致；定位 SDK 从 5.6.0 升级到仍支持 x86_64 模拟器的 6.5.1，消除 Android 16 上的电话权限异常和用户可见 Key 错误遮罩。美国运营商模拟器仍可能打印非阻断的 `SERVICE_NOT_EXIST`，但坐标、蓝点和上车点选择均已实测成功。
+- 当前位置仅请求业务所需的 GCJ-02 坐标，不再连带请求未使用的地址信息，避免额外逆地理编码鉴权失败遮挡地图。
+
 - 完成本阶段 Android Release 联调记录：确认后端默认监听 `8080`、模拟器宿主机地址使用 `10.0.2.2`，并补充 API 地址注入、旧 APK 和 HTTP 明文流量排查说明。
 
 - 修复登录失败时 Session Gate 重建登录页导致输入内容被清空且错误未提示的问题；提交状态改由登录页管理，API 错误现在显示为 SnackBar，Release 登录失败行为与 Debug 一致。

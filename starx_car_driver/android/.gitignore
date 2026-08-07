@@ -1,2 +1,16 @@
+gradle-wrapper.jar
+/.gradle/
+/.kotlin/
+/build/
+/captures/
+/gradlew
+/gradlew.bat
+/local.properties
+GeneratedPluginRegistrant.java
+.cxx/
+
+# Local Android SDK and signing configuration must never be committed.
 amap.properties
 key.properties
+**/*.keystore
+**/*.jks

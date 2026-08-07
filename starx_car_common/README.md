@@ -37,7 +37,9 @@
 ### 高德 Android 基础能力
 
 - 本地 vendor 的 `amap_flutter_map`、`amap_flutter_location` 和 `amap_flutter_base` 适配 Flutter 3.44；底层仍使用高德官方 Android SDK。
-- `AmapMapView` 接受 GCJ-02 标记和可选路线折线；`AmapLocationService` 支持持续定位流和一次性当前位置请求。
+- 本地 `amap_flutter_map` 已移除地图加载完成时调试分支中的无效空数组访问，地图首次启动不再固定打印 `ArrayIndexOutOfBoundsException`。
+- `amap_flutter_location` 使用定位 SDK 6.5.1，兼顾新版 Android 兼容修复与 x86_64 模拟器运行能力。
+- `AmapMapView` 接受 GCJ-02 标记和可选路线折线；`AmapLocationService` 支持持续定位流和一次性当前位置请求，定位只请求坐标，不额外调用地址解析服务或消耗逆地理编码配额。
 - `AmapNavigationService` 只负责打开已安装的高德地图进行驾车导航，调用方负责订单状态和位置上报策略。
 - `AmapRouteService` 通过官方 Android 路线 SDK 返回距离、时长和 GCJ-02 折线；不使用 Web Service Key。
 - `AmapSearchService` 支持以当前位置为中心的 POI 搜索和逆地理编码，结果转换为 `Place`。
@@ -59,7 +61,7 @@ starx_car_driver ────┘
 - `dio`：HTTP 传输。
 - `flutter_secure_storage 9.2.4`：Android Keystore 安全存储。
 - `url_launcher 6.3.2`：打开高德地图外部导航 URI。
-- Android app 显式打包高德 `3dmap:8.1.0`、`location:5.6.0` 和 `search:9.7.0` 官方 SDK；Flutter wrapper 的 `compileOnly` 声明不会替代运行时依赖。
+- Android app 显式打包高德 `3dmap:8.1.0`、`location:6.5.1` 和 `search:9.7.0` 官方 SDK；Flutter wrapper 的 `compileOnly` 声明不会替代运行时依赖。
 - `path_provider_android 2.2.22`：在包与两个 App 中固定该版本，避免新版本引入的 `jni` Android Gradle 插件与当前 Flutter 3.44 Gradle 模板冲突。
 
 ## 使用与验证

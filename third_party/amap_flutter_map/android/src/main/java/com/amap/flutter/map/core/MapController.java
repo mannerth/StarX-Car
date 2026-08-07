@@ -43,13 +43,10 @@ public class MapController
         AMap.OnMapClickListener,
         AMap.OnMapLongClickListener,
         AMap.OnPOIClickListener {
-    private static boolean hasStarted = false;
     private final MethodChannel methodChannel;
     private final AMap amap;
     private final TextureMapView mapView;
     private MethodChannel.Result mapReadyResult;
-    protected int[] myArray = {};
-
     private static final String CLASS_NAME = "MapController";
 
     private boolean mapLoaded = false;
@@ -163,10 +160,6 @@ public class MapController
             }
         } catch (Throwable e) {
             LogUtil.e(CLASS_NAME, "onMapLoaded", e);
-        }
-        if (LogUtil.isDebugMode && !hasStarted) {
-            hasStarted = true;
-            int index = myArray[0];
         }
     }
 

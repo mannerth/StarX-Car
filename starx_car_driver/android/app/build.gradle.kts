@@ -64,7 +64,7 @@ dependencies {
     // The vendored Flutter wrappers declare these as compileOnly; the app
     // must package the official AMap Android SDKs at runtime.
     implementation("com.amap.api:3dmap:8.1.0")
-    implementation("com.amap.api:location:5.6.0")
+    implementation("com.amap.api:location:6.5.1")
     implementation("com.amap.api:search:9.7.0")
 }
 

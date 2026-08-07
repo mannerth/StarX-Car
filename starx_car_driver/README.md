@@ -85,6 +85,7 @@ lib/
 - 签名文件和 `key.properties` 均不可提交、删除或分享。
 - release 签名路径从 Android 项目根目录解析，当前本机配置可使用仓库根目录 `android-signing/starx-car-release.jks` 构建；APK 证书 SHA-1 为 `4C:83:43:EE:4B:E8:5E:0B:89:7A:29:E9:83:D8:17:C1:9A:0C:BF:73`，须在高德控制台登记到司机端 Key。
 - 当前本机 debug APK 证书 SHA-1 为 `1C:50:46:29:AE:A7:92:22:36:9C:CB:83:B7:E7:53:D1:1B:AE:D8:28`；若出现高德 `INVALID_USER_SCODE`，先确认司机端 Key 的 Android 包名为本行 application ID，并同时登记实际构建签名的 SHA-1。
+- 高德定位 SDK 使用仍支持 x86_64 模拟器的 6.5.1；主清单统一声明地图/定位所需网络、Wi-Fi、A-GPS 权限并注册 `APSService`，debug 与 release 配置一致。
 
 ```powershell
 cd starx_car_driver
@@ -96,19 +97,21 @@ fvm flutter build apk --debug
 # 连接 Android 真机后运行启动级集成测试
  fvm flutter test integration_test/app_start_test.dart
  fvm flutter test integration_test/amap_map_test.dart -d <android-device> # 需要已配置高德 Key
+ fvm flutter test integration_test/amap_location_test.dart -d <android-device> # 需要前台精确定位权限
  fvm flutter test integration_test/foreground_service_test.dart -d <android-device> # 需要授予定位和通知权限
  fvm flutter test --dart-define=API_BASE_URL=http://127.0.0.1:1/api integration_test/auth_error_test.dart -d <android-device>
 ```
 
-本次验证：`fvm flutter analyze`、`fvm flutter test`、`fvm flutter build apk --debug` 均通过；启动级 integration test 已在 `Pixel 9 Pro (Android 16/API 36)` 安装运行并通过。清单已注入非空高德 Key，但模拟器日志报告 `INVALID_USER_SCODE`，因此地图 Key 的控制台包名/SHA-1 配置仍未验收通过；定位权限、GPS 和前台服务仍需继续实测。
+本次验证：`fvm flutter analyze`、`fvm flutter test`、`fvm flutter build apk --debug` 和高德地图挂载测试均通过。已在 `Pixel 9 Pro (Android 16/API 36)` 撤销全部运行时权限后单次调用前台服务启动：系统连续展示定位和通知授权页，同一个调用在整组授权后自动启动并停止服务，无需再次点击开关；一次性高德定位返回 `hasPoint=true, errorCode=0`，司机 Key 未再报告 `INVALID_USER_SCODE`、海外权限或 `SERVICE_NOT_EXIST`。
 
 若出现“older Android embedding”并提示缺少 `android/AndroidManifest.xml`，说明使用了系统全局 Flutter。请在本模块目录执行 `fvm flutter ...`；本工程已使用 Android embedding v2，不能通过新增根级 Manifest 修复该提示。
 
 ## Android 前台服务
 
 - 司机上线时会启动 `DriverForegroundService`，显示“正在听单并上报位置”的常驻通知；下线、登出或服务销毁时停止。
-- Android 13+ 需要允许通知，Android 14+ 需要允许前台定位服务和定位权限；缺少权限时不会把服务端工作状态切为在线。
-- 断网退避、权限引导和前台服务行为仍需在 Android 真机上验证。
+- 首次上线会在同一次原生权限请求中提交粗略/精确定位与 Android 13+ 通知权限；用户完成整组授权后自动继续启动服务和上线，无需为每项缺失权限反复拨动开关。
+- Android 13+ 需要允许通知，Android 14+ 需要允许前台定位服务和精确定位权限；拒绝任一权限时不会把服务端工作状态切为在线。司机端只申请前台定位，不申请后台定位。
+- 断网退避和长时间后台运行仍需在 Android 真机上验证。
 
 ## 尚未实现
 

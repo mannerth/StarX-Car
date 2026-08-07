@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 同步当前依赖对应的 Linux、macOS 和 Windows Flutter 插件注册器；vendor 高德插件示例工程保留在本地但不再出现在 Git 工作区状态中。
+
 - 恢复 Android Flutter/Gradle 忽略规则，停止追踪 Gradle wrapper、原生生成注册器和构建报告；本机高德 Key、SDK 路径、签名配置与缓存继续保留在工作区但不进入 Git。
 
 - 修复听单开关逐项请求权限的问题：首次上线现在一次提交粗略/精确定位和 Android 13+ 通知权限，等待整组结果后自动继续启动前台服务，不再要求每缺一项权限就重新点击开关。

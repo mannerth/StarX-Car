@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 同步当前依赖对应的 Linux、macOS 和 Windows Flutter 插件注册器；vendor 高德插件示例工程保留在本地但不再出现在 Git 工作区状态中。
+
 - 恢复 Android Flutter/Gradle 忽略规则，停止追踪 Gradle wrapper、原生生成注册器和构建报告；本机高德 Key、SDK 路径、签名配置与缓存继续保留在工作区但不进入 Git。
 
 - 修复乘客端高德地图启动时缺少 `ACCESS_NETWORK_STATE` 等权限导致的 `SecurityException`；网络、Wi-Fi、前台定位和 A-GPS 权限及 `APSService` 现在统一声明在主清单，对 debug/release 均生效且不申请后台定位。

@@ -7,6 +7,9 @@ class Place {
     required this.location,
     this.address,
     this.amapPoiId,
+    this.cityName,
+    this.districtName,
+    this.distanceM,
   });
 
   /// Display name returned by AMap, for example a building or station name.
@@ -21,6 +24,13 @@ class Place {
   /// AMap POI identifier, when the place originates from a POI search.
   final String? amapPoiId;
 
+  /// City and district labels used to disambiguate similarly named POIs.
+  final String? cityName;
+  final String? districtName;
+
+  /// Distance from the search center, when AMap provides one.
+  final int? distanceM;
+
   /// Converts the selected GCJ-02 place to the backend request shape.
   Map<String, dynamic> toJson() {
     if (location.coordinateSystem != CoordinateSystem.gcj02) {
@@ -30,8 +40,10 @@ class Place {
       if (amapPoiId != null && amapPoiId!.isNotEmpty) 'poiId': amapPoiId,
       'name': name,
       if (address != null && address!.isNotEmpty) 'address': address,
-      'latitude': location.latitude,
-      'longitude': location.longitude,
+      'latitude': _apiCoordinate(location.latitude),
+      'longitude': _apiCoordinate(location.longitude),
     };
   }
 }
+
+double _apiCoordinate(double value) => double.parse(value.toStringAsFixed(6));

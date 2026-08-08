@@ -5,9 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "starx_car_driver",
+            "name": "虚拟机",
             "request": "launch",
             "type": "dart"
+        },
+        {
+            "name": "真机调试",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--dart-define=API_BASE_URL=http://192.168.0.102:8080/api"
+            ]
         },
         {
             "name": "starx_car_driver (profile mode)",

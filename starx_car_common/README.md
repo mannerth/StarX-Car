@@ -30,7 +30,7 @@
 ### 通用模型
 
 - `ApiResponse<T>`：对应后端 `{ code, message, traceId, data }` 信封。
-- `GeoPoint`、`CoordinateSystem`、`Place`：为后续地图与地点选择提供基础类型。
+- `GeoPoint`、`CoordinateSystem`、`Place`：为地图与地点选择提供基础类型；提交后端时坐标统一保留 6 位小数，匹配接口精度约束。
 - 高德业务坐标统一按 `GCJ-02` 使用；设备 GPS 的 `WGS-84` 必须在地图基础层明确转换或标注，业务端不得混用。
 - `OrderStatus`、`FareQuote`、`OrderQuote`、`OrderSummary`、`OrderPage`、`OrderDetail`、`OrderEvent`、`OrderCompletionResult`、`DriverLocation` 和 `RouteContext`：只负责解析跨角色订单展示字段；金额保留十进制字符串，位置模型保留 `stale` 标志，订单事件枚举保留原始字符串以兼容服务端扩展。
 
@@ -39,10 +39,10 @@
 - 本地 vendor 的 `amap_flutter_map`、`amap_flutter_location` 和 `amap_flutter_base` 适配 Flutter 3.44；底层仍使用高德官方 Android SDK。
 - 本地 `amap_flutter_map` 已移除地图加载完成时调试分支中的无效空数组访问，地图首次启动不再固定打印 `ArrayIndexOutOfBoundsException`。
 - `amap_flutter_location` 使用定位 SDK 6.5.1，兼顾新版 Android 兼容修复与 x86_64 模拟器运行能力。
-- `AmapMapView` 接受 GCJ-02 标记和可选路线折线；`AmapLocationService` 支持持续定位流和一次性当前位置请求，定位只请求坐标，不额外调用地址解析服务或消耗逆地理编码配额。
+- `AmapMapView` 接受 GCJ-02 标记和可选路线折线；标记、路线或定位点变化后会自动居中，多个点会自动缩放至完整可见。`AmapLocationService` 支持持续定位流和一次性当前位置请求，定位只请求坐标，不额外调用地址解析服务或消耗逆地理编码配额。
 - `AmapNavigationService` 只负责打开已安装的高德地图进行驾车导航，调用方负责订单状态和位置上报策略。
 - `AmapRouteService` 通过官方 Android 路线 SDK 返回距离、时长和 GCJ-02 折线；不使用 Web Service Key。
-- `AmapSearchService` 支持以当前位置为中心的 POI 搜索和逆地理编码，结果转换为 `Place`。
+- `AmapSearchService` 支持 POI 搜索和逆地理编码：有定位城市时先在同城搜索并按当前位置距离排序，同城无结果自动进行全国搜索；结果携带城市、区县和可用距离并转换为 `Place`。
 
 ## 职责边界
 

@@ -27,7 +27,7 @@ async function submit() {
 <template>
   <main class="login-page">
     <form class="login-card" @submit.prevent="submit">
-      <div class="brand"><span>✦</span><div><strong>StarX-Car</strong><small>管理后台</small></div></div>
+      <div class="brand"><span>S</span><div><strong>StarX-Car</strong><small>管理后台</small></div></div>
       <h1>管理员登录</h1>
       <p>使用已创建的管理员账号登录。</p>
       <label>用户名<input v-model="username" required minlength="3" autocomplete="username" /></label>

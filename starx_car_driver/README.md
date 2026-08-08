@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-司机登录/注册、加密会话恢复、基础资料、司机资料、密码与车辆绑定功能均已对接后端；司机工作台已支持上线/下线、位置上报、待抢订单轮询、抢单、确认到达、开始服务和完成结算。抢单成功后会刷新已接订单并直接打开订单详情。进行中订单可进入详情页查看地图、上车点/目的地，并跳转高德外部导航；详情页和工作台快捷完成按钮都会展示服务端返回的实际时长、等待时长和最终金额。位置上报、待抢订单和已接订单查询会随任务生命周期取消在途请求，避免下线/退出后继续提交旧数据。项目使用 Riverpod 管理会话；`flutter analyze`、`flutter test`、Android debug APK 构建均已通过。认证 Controller 测试覆盖角色会话恢复、匹配登录保存和错误角色拒绝；Repository 契约测试覆盖当前车辆解析、GCJ-02 位置上报、WGS-84 拒绝和状态动作/完成账单。
+司机登录/注册、加密会话恢复、基础资料、司机资料、密码与车辆绑定功能均已对接后端；司机工作台已支持上线/下线、位置上报、待抢订单轮询、抢单、确认到达、开始服务和完成结算。抢单需二次确认，成功后会刷新已接订单并直接打开订单详情。进行中订单从工作台统一进入详情页查看地图、上车点/目的地、跳转高德外部导航，并在确认后推进到达、开始和完成状态。位置上报、待抢订单和已接订单查询会随任务生命周期取消在途请求，离线时不会请求待抢订单。项目使用 Riverpod 管理会话；`flutter analyze`、`flutter test`、Android debug APK 构建均已通过。认证 Controller 测试覆盖角色会话恢复、匹配登录保存和错误角色拒绝；Repository 契约测试覆盖当前车辆解析、GCJ-02 位置上报、WGS-84 拒绝和状态动作/完成账单。
 
 ## 已实现功能
 
@@ -79,6 +79,7 @@ lib/
 - 跨角色接口字段、状态机、错误码和坐标约定见仓库根目录的 [`docs/client-api-contract.md`](../docs/client-api-contract.md)。
 - 默认后端地址：`http://10.0.2.2:8080/api`；可通过 `--dart-define=API_BASE_URL=...` 覆盖。
 - 高德 Android Key 配置在本项目 `android/amap.properties` 的 `AMAP_ANDROID_KEY`；该文件已忽略且不能提交。`--dart-define` 只用于 API 地址，不能替代原生清单 Key。
+- 若日志出现 `SERVICE_NOT_EXIST`，说明 Key 已被识别但高德控制台未开通 Android 定位 SDK 服务；请在该 Key 的“服务平台/服务权限”中启用定位，并核对包名 `org.mannerth.starxcar.driver` 与实际 debug/release SHA-1。`hiddenapi` 反射提示是高德 SDK 在 Android 新版本上的兼容性警告，不是业务失败原因。
 - 本地开发允许 HTTP，生产必须改用 HTTPS。
 - 因工程位于 D 盘、Flutter Pub 缓存位于 C 盘，已关闭 Kotlin 增量编译并使用进程内编译，避免 `image_picker_android` 的跨盘缓存错误；首次 Android 构建会稍慢。
 - 未配置 `android/key.properties` 时仍可构建 debug APK；配置本机 release 签名后 release 构建会自动使用它。

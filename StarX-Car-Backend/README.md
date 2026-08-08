@@ -61,6 +61,7 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 - 车辆拆分车牌组合唯一；`driver_car_binding` 保存有效及历史绑定，司机可拥有多辆有效绑定车辆；`driver.car_id` 只表示当前实际使用的车辆。车辆绑定和解绑同时记录历史。
 - 乘客/司机号码的尾号和脱敏展示号由 MySQL 触发器维护。
 - 数据库已预留账号实名/状态、司机审核与工作状态、车辆归属地和拆分车牌字段；`driver_car_binding` 保留司机换车的绑定历史，当前 API 仍使用 `driver.car_id` 维护即时绑定关系。
+- 管理员可分页查看司机的账号、证件、审核状态和当前车辆资料，按审核状态或资料关键字筛选，并将待审核申请一次性处理为通过或驳回；审核后司机保持未出车状态，已处理申请不能重复修改。
 
 ### 图片上传
 
@@ -173,6 +174,8 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 | `GET` / `PUT` | `/api/admin/pricing-rules/{ruleId}` | 管理员 | 查看规则；或完整更新未被订单引用的草稿分段。 |
 | `POST` | `/api/admin/pricing-rules/{ruleId}/activate` | 管理员 | 激活草稿；`setAsDefault=true` 时原子切换当前默认规则。 |
 | `POST` | `/api/admin/pricing-rules/{ruleId}/archive` | 管理员 | 归档非当前默认规则，保留历史规则及已结算订单可读性。 |
+| `GET` | `/api/admin/drivers` | 管理员 | 分页查询司机审核资料，可按 `pending`、`approved`、`rejected` 状态及账号、姓名、联系方式或证件号筛选。 |
+| `PUT` | `/api/admin/drivers/{driverId}/approval` | 管理员 | 将待审核司机处理为 `approved` 或 `rejected`；已审核或账号不可用时拒绝操作。 |
 
 完整的请求模型、示例和错误状态码，请访问 Swagger UI：`/swagger-ui.html`。
 

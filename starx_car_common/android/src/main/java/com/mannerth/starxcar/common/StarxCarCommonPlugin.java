@@ -126,14 +126,14 @@ public final class StarxCarCommonPlugin implements FlutterPlugin, MethodChannel.
             query.setPageSize(20);
             query.setPageNum(0);
             query.setDistanceSort(true);
+            query.setCityLimit(!city.isEmpty());
             Double lat = optionalNumber(args.get("latitude"));
             Double lng = optionalNumber(args.get("longitude"));
-            PoiSearch search = new PoiSearch(context, query);
             if (lat != null && lng != null) {
                 LatLonPoint center = new LatLonPoint(lat, lng);
                 query.setLocation(center);
-                search.setBound(new PoiSearch.SearchBound(center, 5000, true));
             }
+            PoiSearch search = new PoiSearch(context, query);
             search.setOnPoiSearchListener(new PoiSearch.OnPoiSearchListener() {
                 @Override
                 public void onPoiSearched(PoiResult poiResult, int code) {
@@ -150,6 +150,11 @@ public final class StarxCarCommonPlugin implements FlutterPlugin, MethodChannel.
                             value.put("poiId", item.getPoiId());
                             value.put("name", item.getTitle());
                             value.put("address", item.getSnippet());
+                            value.put("cityName", item.getCityName());
+                            value.put("districtName", item.getAdName());
+                            if (lat != null && lng != null && item.getDistance() >= 0) {
+                                value.put("distanceM", item.getDistance());
+                            }
                             value.put("latitude", point.getLatitude());
                             value.put("longitude", point.getLongitude());
                             values.add(value);
@@ -192,6 +197,10 @@ public final class StarxCarCommonPlugin implements FlutterPlugin, MethodChannel.
                     Map<String, Object> response = new HashMap<>();
                     response.put("name", address.getFormatAddress());
                     response.put("address", address.getFormatAddress());
+                    String cityName = address.getCity();
+                    if (cityName == null || cityName.isEmpty()) cityName = address.getProvince();
+                    response.put("cityName", cityName);
+                    response.put("districtName", address.getDistrict());
                     result.success(response);
                 }
 

@@ -11,6 +11,8 @@ import org.mannerth.starxcar.driver.DriverCarBinding;
 import org.mannerth.starxcar.driver.DriverMapper;
 import org.mannerth.starxcar.driver.DriverCarBindingMapper;
 import org.mannerth.starxcar.driver.DriverWorkService;
+import org.mannerth.starxcar.driver.AdminDriverService;
+import org.mannerth.starxcar.driver.response.AdminDriverPageResponse;
 import org.mannerth.starxcar.infra.image.ImageService;
 import org.mannerth.starxcar.infra.image.response.ImageUploadResponse;
 import org.mannerth.starxcar.order.pricing.PricingRuleMapper;
@@ -132,8 +134,35 @@ class StarXCarBackendApplicationTests {
     @MockitoBean
     private AdminPricingRuleService adminPricingRuleService;
 
+    @MockitoBean
+    private AdminDriverService adminDriverService;
+
     @Test
     void contextLoads() {
+    }
+
+    @Test
+    void adminDriverReviewEndpointsRequireAdminAndAppearInOpenApi() throws Exception {
+        User admin = new User();
+        admin.setId(1L);
+        admin.setType(UserType.admin);
+        admin.setStatus("active");
+        given(userMapper.selectById(1L)).willReturn(admin);
+        given(adminDriverService.list(1, 20, null, "pending"))
+                .willReturn(new AdminDriverPageResponse(1, 20, 0, java.util.List.of()));
+
+        mockMvc.perform(get("/api/admin/drivers")
+                        .param("approvalStatus", "pending")
+                        .header("Authorization", "Bearer " + adminToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+        mockMvc.perform(get("/api/admin/drivers")
+                        .header("Authorization", "Bearer " + passengerToken()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/admin/drivers'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/admin/drivers/{driverId}/approval'].put").exists());
     }
 
     @Test

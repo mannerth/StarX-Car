@@ -43,7 +43,23 @@ class PassengerProfilePage extends ConsumerWidget {
       ),
       body: profile.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('加载失败：$error')),
+        error: (error, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('个人资料加载失败'),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  ref.invalidate(passengerProfileProvider);
+                  ref.invalidate(passengerDetailProvider);
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('重试'),
+              ),
+            ],
+          ),
+        ),
         data: (value) => _ProfileContent(profile: value),
       ),
     );
@@ -97,7 +113,16 @@ class _ProfileContent extends ConsumerWidget {
                 title: const Text('手机号'),
                 subtitle: passenger.when(
                   loading: () => const Text('加载中…'),
-                  error: (_, _) => const Text('加载失败'),
+                  error: (_, _) => Row(
+                    children: [
+                      const Text('加载失败'),
+                      TextButton(
+                        onPressed: () =>
+                            ref.invalidate(passengerDetailProvider),
+                        child: const Text('重试'),
+                      ),
+                    ],
+                  ),
                   data: (value) => Text(
                     value['displayPhone'] as String? ??
                         value['phoneNumber'] as String,
@@ -348,6 +373,9 @@ class _ProfileContent extends ConsumerWidget {
           FilledButton(
             onPressed: () async {
               if (fresh.text.length < 6) {
+                ScaffoldMessenger.of(
+                  dialogContext,
+                ).showSnackBar(const SnackBar(content: Text('新密码至少需要 6 位')));
                 return;
               }
               try {

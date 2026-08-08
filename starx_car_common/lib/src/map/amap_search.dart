@@ -18,8 +18,26 @@ class AmapSearchService {
   }) async {
     if (keyword.trim().isEmpty) return const [];
     _check(near);
+    final normalizedKeyword = keyword.trim();
+    final normalizedCity = city?.trim();
+    final cityResults = await _searchPoi(
+      normalizedKeyword,
+      city: normalizedCity,
+      near: near,
+    );
+    if (cityResults.isNotEmpty || normalizedCity?.isNotEmpty != true) {
+      return cityResults;
+    }
+    return _searchPoi(normalizedKeyword, near: near);
+  }
+
+  Future<List<Place>> _searchPoi(
+    String keyword, {
+    String? city,
+    GeoPoint? near,
+  }) async {
     final response = await _channel.invokeMethod<List<dynamic>>('searchPoi', {
-      'keyword': keyword.trim(),
+      'keyword': keyword,
       if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
       if (near != null) ...{
         'latitude': near.latitude,
@@ -35,6 +53,9 @@ class AmapSearchService {
             name: json['name']?.toString() ?? '未命名地点',
             address: json['address']?.toString(),
             amapPoiId: json['poiId']?.toString(),
+            cityName: json['cityName']?.toString(),
+            districtName: json['districtName']?.toString(),
+            distanceM: (json['distanceM'] as num?)?.toInt(),
             location: GeoPoint(
               latitude: (json['latitude'] as num).toDouble(),
               longitude: (json['longitude'] as num).toDouble(),
@@ -54,7 +75,13 @@ class AmapSearchService {
     final name = json['name']?.toString();
     final address = json['address']?.toString();
     if (name == null || name.isEmpty) return null;
-    return Place(name: name, address: address, location: point);
+    return Place(
+      name: name,
+      address: address,
+      cityName: json['cityName']?.toString(),
+      districtName: json['districtName']?.toString(),
+      location: point,
+    );
   }
 
   void _check(GeoPoint? point) {

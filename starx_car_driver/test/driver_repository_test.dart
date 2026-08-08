@@ -24,7 +24,10 @@ void main() {
     final recorded = DateTime(2026, 8, 6, 12, 3, 4);
 
     await repository.reportLocation(
-      point: const GeoPoint(latitude: 31.2, longitude: 121.4),
+      point: const GeoPoint(
+        latitude: 31.23456789,
+        longitude: 121.45678912,
+      ),
       recordedTime: recorded,
       accuracyM: 4.5,
       speedMps: 2.1,
@@ -33,8 +36,8 @@ void main() {
 
     expect(api.lastPath, 'PUT /drivers/me/location');
     expect(api.lastData, {
-      'latitude': 31.2,
-      'longitude': 121.4,
+      'latitude': 31.234568,
+      'longitude': 121.456789,
       'accuracyM': 4.5,
       'speedMps': 2.1,
       'bearing': 90,

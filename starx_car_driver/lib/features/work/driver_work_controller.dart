@@ -69,11 +69,13 @@ class DriverWorkController extends AsyncNotifier<bool> {
         _online = true;
         _activeRepository = repo;
         _startTasks(repo);
+        ref.invalidate(pendingOrdersProvider);
       } else {
         await repo.updateWorkStatus('offline');
         _online = false;
         _pauseTasks();
         await _stopForegroundService();
+        ref.invalidate(pendingOrdersProvider);
       }
       return online;
     });
@@ -231,7 +233,14 @@ class DriverWorkController extends AsyncNotifier<bool> {
 
 final pendingOrdersProvider = FutureProvider.autoDispose<OrderPage>((ref) {
   ref.watch(driverAuthProvider);
-  ref.watch(driverWorkProvider);
+  // Do not watch driverWorkProvider here: driverWorkProvider owns the timer
+  // that invalidates this provider, and watching it creates a Riverpod cycle
+  // while both providers are being initialized. Work-status changes explicitly
+  // invalidate pendingOrdersProvider after the mutation completes.
+  final online = ref.read(driverWorkProvider).value ?? false;
+  if (!online) {
+    return const OrderPage(page: 1, size: 20, total: 0, records: []);
+  }
   final cancelToken = CancelToken();
   ref.onDispose(() => cancelToken.cancel('pending orders provider disposed'));
   return ref

@@ -1,6 +1,9 @@
 package com.amap.flutter.location;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
 import android.text.TextUtils;
 
 import com.amap.api.location.AMapLocationClient;
@@ -163,6 +166,23 @@ public class AMapFlutterLocationPlugin implements FlutterPlugin, MethodCallHandl
   public void onAttachedToEngine(FlutterPluginBinding binding) {
     if (null == mContext) {
       mContext = binding.getApplicationContext();
+
+      // The app injects the key through AndroidManifest placeholders. Apply
+      // the same value explicitly because newer location SDKs may initialize
+      // before they read the manifest metadata.
+      try {
+        ApplicationInfo info = mContext.getPackageManager().getApplicationInfo(
+                mContext.getPackageName(), PackageManager.GET_META_DATA);
+        Bundle metadata = info.metaData;
+        if (metadata != null) {
+          String apiKey = metadata.getString("com.amap.api.v2.apikey");
+          if (!TextUtils.isEmpty(apiKey)) {
+            AMapLocationClient.setApiKey(apiKey);
+          }
+        }
+      } catch (PackageManager.NameNotFoundException ignored) {
+        // The Flutter engine can still be used without AMap configuration.
+      }
 
       /**
        * 方法调用通道

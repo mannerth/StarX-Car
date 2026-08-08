@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-08
+
+### 管理员司机审核
+
+- 新增 `GET /api/admin/drivers` 管理员司机审核列表，支持按 `pending`、`approved`、`rejected` 状态筛选，并按用户名、姓名、邮箱、手机号、驾驶证号或身份证号搜索；响应组合用户状态、证件有效期、评分、工作状态和当前车辆资料，且不返回密码。
+- 新增 `PUT /api/admin/drivers/{driverId}/approval` 审核接口，仅允许状态为 active 的管理员将 `pending` 司机一次性处理为 `approved` 或 `rejected`；已审核司机、不可用账号和缺失资料分别返回明确的 409 或 404，处理后强制保持 `offline`。
+- 为审核列表组合、通过审核、重复审核冲突、管理员权限和 OpenAPI 路径补充自动化测试；本次复用现有 `driver.approval_status` 与相关表结构，没有新增或修改数据库表、字段和索引。
+
 ## 2026-08-05
 
 ### 乘客注销历史保留

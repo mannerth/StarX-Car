@@ -1,5 +1,10 @@
 ## Unreleased
 
+- POI 搜索移除固定 5 公里硬边界，改为当前城市优先并按定位点距离排序；同城无结果时自动全国兜底。逆地理编码和 POI 结果增加城市、区县及可用距离信息。
+
+- `AmapMapView` 增加响应式地图视野：单点变化后自动居中，双点或路线变化后按边界缩放，并用不同颜色区分起终点。
+- `Place.toJson` 将高德坐标统一四舍五入至 6 位小数，匹配后端 `@Digits` 约束，修复部分 POI 报价时出现“数字的值超出了允许的范围”；增加精度和坐标系测试。
+
 - 修复内置 `amap_flutter_map` 在地图加载完成时主动读取空数组、导致每次首次启动固定抛出 `ArrayIndexOutOfBoundsException` 的问题。
 - 将高德定位 SDK 从 5.6.0 升级到仍支持 x86_64 模拟器的 6.5.1，纳入新版 Android 的合规与兼容修复。
 - 关闭定位请求中未使用的地址解析，避免一次性当前位置额外触发逆地理编码鉴权和配额消耗；地点名称仍由独立的搜索/逆地理编码能力按需获取。
@@ -47,3 +52,6 @@
 
 - Initialize the local shared package for the passenger and driver Android apps.
 - Add common API response, authentication session, and map location models.
+## Unreleased
+
+- 高德定位插件启动时从应用清单读取 `com.amap.api.v2.apikey` 并显式设置定位 SDK，避免 Android 初始化时序导致 Key 未生效。

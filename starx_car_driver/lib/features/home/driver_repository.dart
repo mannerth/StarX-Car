@@ -53,8 +53,10 @@ class DriverRepository {
     await _api.put(
       '/drivers/me/location',
       data: {
-        'latitude': point.latitude,
-        'longitude': point.longitude,
+        // The API and its DECIMAL(10,6) storage accept at most six
+        // fractional digits. AMap may return more precision on some devices.
+        'latitude': _apiCoordinate(point.latitude),
+        'longitude': _apiCoordinate(point.longitude),
         ...?accuracyM == null ? null : {'accuracyM': accuracyM},
         ...?speedMps == null ? null : {'speedMps': speedMps},
         ...?bearing == null ? null : {'bearing': bearing},
@@ -154,6 +156,8 @@ class DriverRepository {
     }
   }
 }
+
+double _apiCoordinate(double value) => double.parse(value.toStringAsFixed(6));
 
 String _formatBackendTime(DateTime value) {
   final local = value.toLocal();

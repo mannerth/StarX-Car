@@ -17,7 +17,7 @@ void main() {
     final repository = PassengerOrderRepository(api);
 
     final quote = await repository.quote(
-      pickup: _place('上车点', 31.2, 121.4),
+      pickup: _place('上车点', 31.23456789, 121.45678912),
       destination: _place('目的地', 31.21, 121.42),
     );
 
@@ -25,7 +25,8 @@ void main() {
     expect(quote.fare.totalFare, '18.50');
     expect(api.lastPath, 'POST /orders/quote');
     final body = api.lastData as Map<String, dynamic>;
-    expect((body['pickup'] as Map<String, dynamic>)['latitude'], 31.2);
+    expect((body['pickup'] as Map<String, dynamic>)['latitude'], 31.234568);
+    expect((body['pickup'] as Map<String, dynamic>)['longitude'], 121.456789);
     expect((body['destination'] as Map<String, dynamic>)['longitude'], 121.42);
   });
 

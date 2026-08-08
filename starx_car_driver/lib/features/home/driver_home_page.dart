@@ -137,7 +137,23 @@ class DriverProfileTab extends ConsumerWidget {
       return const Center(child: CircularProgressIndicator());
     }
     if (user.hasError || driver.hasError) {
-      return Center(child: Text('加载失败：${user.error ?? driver.error}'));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('司机资料加载失败'),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                ref.invalidate(userProfileProvider);
+                ref.invalidate(driverProfileProvider);
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('重试'),
+            ),
+          ],
+        ),
+      );
     }
     final u = user.requireValue;
     final d = driver.requireValue;
@@ -372,7 +388,23 @@ class CarTab extends ConsumerWidget {
       return const Center(child: CircularProgressIndicator());
     }
     if (driver.hasError || cars.hasError) {
-      return Center(child: Text('加载失败：${driver.error ?? cars.error}'));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('车辆资料加载失败'),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                ref.invalidate(driverProfileProvider);
+                ref.invalidate(carsProvider);
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('重试'),
+            ),
+          ],
+        ),
+      );
     }
     final currentCarId = (driver.requireValue['carId'] as num?)?.toInt();
     final values = cars.requireValue;

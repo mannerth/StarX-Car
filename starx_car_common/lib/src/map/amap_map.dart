@@ -1,5 +1,7 @@
 import 'package:amap_flutter_base/amap_flutter_base.dart';
 import 'package:amap_flutter_map/amap_flutter_map.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'geo_point.dart';
 
@@ -81,6 +83,12 @@ class _AmapMapViewState extends State<AmapMapView> {
         hasShow: true,
         hasAgree: true,
       ),
+      // 注册 EagerGestureRecognizer，让地图参与手势竞技场。
+      // 平台视图默认不参与竞技场，放入 ListView/滚动容器时所有指针
+      // 事件都会被父级滚动识别器抢走，导致地图无法拖动和缩放。
+      gestureRecognizers: {
+        Factory<EagerGestureRecognizer>(EagerGestureRecognizer.new),
+      },
       onMapCreated: (controller) {
         _controller = controller;
         WidgetsBinding.instance.addPostFrameCallback((_) {

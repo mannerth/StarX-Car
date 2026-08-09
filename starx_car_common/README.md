@@ -39,7 +39,7 @@
 - 本地 vendor 的 `amap_flutter_map`、`amap_flutter_location` 和 `amap_flutter_base` 适配 Flutter 3.44；底层仍使用高德官方 Android SDK。
 - 本地 `amap_flutter_map` 已移除地图加载完成时调试分支中的无效空数组访问，地图首次启动不再固定打印 `ArrayIndexOutOfBoundsException`。
 - `amap_flutter_location` 使用定位 SDK 6.5.1，兼顾新版 Android 兼容修复与 x86_64 模拟器运行能力。
-- `AmapMapView` 接受 GCJ-02 标记和可选路线折线；标记、路线或定位点变化后会自动居中，多个点会自动缩放至完整可见。`AmapLocationService` 支持持续定位流和一次性当前位置请求，定位只请求坐标，不额外调用地址解析服务或消耗逆地理编码配额。
+- `AmapMapView` 接受 GCJ-02 标记和可选路线折线；标记、路线或定位点变化后会自动居中，多个点会自动缩放至完整可见。地图已注册手势识别器，即使嵌入 `ListView` 等滚动容器仍支持拖动、缩放、旋转和倾斜操控。`AmapLocationService` 支持持续定位流和一次性当前位置请求，定位只请求坐标，不额外调用地址解析服务或消耗逆地理编码配额。
 - `AmapNavigationService` 只负责打开已安装的高德地图进行驾车导航，调用方负责订单状态和位置上报策略。
 - `AmapRouteService` 通过官方 Android 路线 SDK 返回距离、时长和 GCJ-02 折线；不使用 Web Service Key。
 - `AmapSearchService` 支持 POI 搜索和逆地理编码：有定位城市时先在同城搜索并按当前位置距离排序，同城无结果自动进行全国搜索；结果携带城市、区县和可用距离并转换为 `Place`。

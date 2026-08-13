@@ -166,8 +166,9 @@ final passengerApproachProvider = StreamProvider.autoDispose
               ? double.infinity
               : now.difference(plannedDriverAt).inSeconds;
           final shouldRefreshDriverRoute = driverRoute == null
-              ? plannedDriverAt == null || driverSecondsSincePlan >= 30
-              : driverDistanceMoved >= 100 || driverSecondsSincePlan >= 30;
+              ? plannedDriverAt == null || driverSecondsSincePlan >= 5
+              : driverDistanceMoved >= _approachDriverRefreshDistanceM ||
+                    driverSecondsSincePlan >= _approachDriverRefreshSeconds;
           if (shouldRefreshDriverRoute) {
             plannedDriverAt = now;
             try {
@@ -219,7 +220,7 @@ final passengerApproachProvider = StreamProvider.autoDispose
             locationError: locationError,
             nearPickup: nearPickup,
           );
-          await Future<void>.delayed(const Duration(seconds: 4));
+          await Future<void>.delayed(_passengerLocationPollInterval);
         }
       },
     );
@@ -279,10 +280,12 @@ final passengerTripRouteProvider = StreamProvider.autoDispose
         final secondsSincePlan = plannedAt == null
             ? double.infinity
             : now.difference(plannedAt).inSeconds;
+        // 司机位置每 2 秒轮询；路线在司机移动超过一定距离或超过间隔后重规划，
+        // 上次规划失败且暂无路线时每 5 秒自动重试，大范围移动后尽快刷新路线与视野。
         final shouldRefresh = route == null
-            ? plannedAt == null || secondsSincePlan >= 30
-            : distanceMoved >= context.recommendedRefreshDistanceM ||
-                  secondsSincePlan >= context.recommendedRefreshSeconds;
+            ? plannedAt == null || secondsSincePlan >= 5
+            : distanceMoved >= _routeRefreshDistanceM ||
+                  secondsSincePlan >= _routeRefreshSeconds;
         if (shouldRefresh) {
           plannedAt = now;
           try {
@@ -301,7 +304,7 @@ final passengerTripRouteProvider = StreamProvider.autoDispose
           route: route,
           routeError: routeError,
         );
-        await Future<void>.delayed(const Duration(seconds: 4));
+        await Future<void>.delayed(_passengerLocationPollInterval);
       }
     });
 
@@ -715,6 +718,7 @@ class _ApproachPanel extends ConsumerWidget {
             child: AmapMapView(
               initialPoint: value.driverLocation.point,
               markers: [pickup.location, value.driverLocation.point],
+              markerColors: [Colors.green.shade700, Colors.blue],
               routePoints: value.driverRoute?.points ?? const [],
               routes: value.walkingRoute == null
                   ? const []
@@ -805,7 +809,13 @@ class _RoutePanel extends ConsumerWidget {
                 value.context.driverLocation.point,
                 value.context.destination.location,
               ],
+              markerColors: [Colors.blue, Colors.red.shade700],
               routePoints: value.route?.points ?? const [],
+              // 视野跟随司机当前位置与目的地，位置每次轮询更新后地图立即重绘。
+              viewportPoints: [
+                value.context.driverLocation.point,
+                value.context.destination.location,
+              ],
             ),
           ),
           Text(
@@ -981,6 +991,18 @@ bool _isTerminalOrderStatus(OrderStatus status) =>
     status == OrderStatus.completed || status == OrderStatus.cancelled;
 
 const _maxPollingFailures = 3;
+
+/// Passenger-side driver location poll interval for the approach and trip
+/// panels. Kept short so a moving driver position is reflected promptly.
+const _passengerLocationPollInterval = Duration(seconds: 2);
+
+/// Re-plan the driving route when the driver has moved this far from the
+/// origin used by the last plan, or after this many seconds, so the route
+/// line and map viewport follow the driver's current position.
+const _routeRefreshDistanceM = 50;
+const _routeRefreshSeconds = 5;
+const _approachDriverRefreshDistanceM = 50;
+const _approachDriverRefreshSeconds = 3;
 
 Future<void> _pollRetryDelay(int failureCount) async {
   final exponent = math.min(failureCount - 1, 4);

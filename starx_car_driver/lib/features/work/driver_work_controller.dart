@@ -96,7 +96,8 @@ class DriverWorkController extends AsyncNotifier<bool> {
       _pendingLocation = update;
       unawaited(_drainLocationQueue(repo, cancelToken));
     });
-    _location!.start();
+    // 2 秒上报一次最新位置，配合乘客端 2 秒轮询，保证行程中司机位置更新及时。
+    _location!.start(interval: const Duration(seconds: 2));
     _pendingTimer ??= Timer.periodic(
       const Duration(seconds: 5),
       (_) => ref.invalidate(pendingOrdersProvider),
@@ -254,3 +255,4 @@ final driverOrdersProvider = FutureProvider.autoDispose<OrderPage>((ref) {
   ref.onDispose(() => cancelToken.cancel('driver orders provider disposed'));
   return ref.read(driverRepositoryProvider).orders(cancelToken: cancelToken);
 });
+

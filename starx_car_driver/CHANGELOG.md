@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 司机端 `debug` 构建改为复用 `android-signing/starx-car-release.jks` 发布签名（`android/app/build.gradle.kts`），debug 与 release 证书 SHA-1 统一为 `4C:83:43:EE:4B:E8:5E:0B:89:7A:29:E9:83:D8:17:C1:9A:0C:BF:73`（`gradlew :app:signingReport` 验证通过）；高德控制台司机端 Key 只需登记这一份签名。`profile` 变体仍使用默认 debug.keystore（SHA-1 `1C:50:46:29:AE:A7:92:22:36:9C:CB:83:B7:E7:53:D1:1B:AE:D8:28`），如需统一可再改。
+
 - 司机订单详情地图升级：接单后标注司机当前位置（蓝色标记），`ACCEPTED` 状态绘制“司机当前位置 → 上车点”驾车路线，`IN_SERVICE` 状态绘制“司机当前位置 → 目的地”驾车路线；位置每 2 秒更新，司机移动超 100 米或间隔 30 秒自动重规划剩余路线，服务中实时标注当前行进位置。
 - common 的 `AmapMapView` 支持按标记自定义颜色（`markerColors`），用于区分司机当前车辆与上车点/目的地。
 

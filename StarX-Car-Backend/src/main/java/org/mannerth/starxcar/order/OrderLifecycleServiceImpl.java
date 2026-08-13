@@ -2,6 +2,8 @@ package org.mannerth.starxcar.order;
 
 import org.mannerth.starxcar.driver.DriverMapper;
 import org.mannerth.starxcar.order.response.OrderStatusTransitionResponse;
+import org.mannerth.starxcar.passenger.Passenger;
+import org.mannerth.starxcar.passenger.PassengerMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,16 +23,19 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     private final RideOrderEventMapper eventMapper;
     private final DriverMapper driverMapper;
     private final DriverLocationMapper locationMapper;
+    private final PassengerMapper passengerMapper;
     private final OrderAccessService orderAccessService;
     private final Clock clock;
 
     public OrderLifecycleServiceImpl(RideOrderMapper orderMapper, RideOrderEventMapper eventMapper,
                                      DriverMapper driverMapper, DriverLocationMapper locationMapper,
-                                     OrderAccessService orderAccessService, Clock clock) {
+                                     PassengerMapper passengerMapper, OrderAccessService orderAccessService,
+                                     Clock clock) {
         this.orderMapper = orderMapper;
         this.eventMapper = eventMapper;
         this.driverMapper = driverMapper;
         this.locationMapper = locationMapper;
+        this.passengerMapper = passengerMapper;
         this.orderAccessService = orderAccessService;
         this.clock = clock;
     }
@@ -71,9 +76,16 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
 
     @Override
     @Transactional
-    public OrderStatusTransitionResponse startService(Long driverId, String orderNo) {
+    public OrderStatusTransitionResponse startService(Long driverId, String orderNo, String phoneTail) {
         RideOrder order = orderAccessService.requireDriverOrder(orderNo, driverId);
         requireTransition(order, OrderEventType.START_SERVICE, OrderStatus.DRIVER_ARRIVED, OrderStatus.IN_SERVICE);
+        if (phoneTail == null || !phoneTail.matches("\\d{4}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "乘客手机尾号必须为 4 位数字");
+        }
+        Passenger passenger = passengerMapper.selectById(order.getPassengerId());
+        if (passenger == null || !phoneTail.equals(passenger.getPhoneTail())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "乘客手机尾号校验失败");
+        }
         if (order.getDriverArrivedTime() == null) {
             throw conflict("订单缺少司机到达时间");
         }
@@ -149,3 +161,4 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
         return new ResponseStatusException(HttpStatus.CONFLICT, reason);
     }
 }
+

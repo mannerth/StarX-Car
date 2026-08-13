@@ -5,6 +5,14 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'geo_point.dart';
 
+/// A colored polyline overlay on [AmapMapView]. Points must be GCJ-02.
+class AmapMapRouteLine {
+  const AmapMapRouteLine({required this.points, required this.color});
+
+  final List<GeoPoint> points;
+  final Color color;
+}
+
 /// Shared AMap widget. Callers must provide GCJ-02 points.
 class AmapMapView extends StatefulWidget {
   const AmapMapView({
@@ -12,14 +20,18 @@ class AmapMapView extends StatefulWidget {
     required this.initialPoint,
     this.markers = const [],
     this.routePoints = const [],
+    this.routes = const [],
     this.viewportPoints = const [],
     this.onTap,
   });
   final GeoPoint initialPoint;
   final List<GeoPoint> markers;
 
-  /// Optional GCJ-02 points for a displayed route polyline.
+  /// Optional GCJ-02 points for the primary (blue) route polyline.
   final List<GeoPoint> routePoints;
+
+  /// Optional colored route polylines drawn on top of [routePoints].
+  final List<AmapMapRouteLine> routes;
 
   /// Points that should remain visible after data updates. A single point is
   /// shown at street level; multiple points are fitted into the viewport.
@@ -53,6 +65,11 @@ class _AmapMapViewState extends State<AmapMapView> {
     ]) {
       _check(point);
     }
+    for (final route in widget.routes) {
+      for (final point in route.points) {
+        _check(point);
+      }
+    }
     return AMapWidget(
       initialCameraPosition: CameraPosition(
         target: _latLng(widget.initialPoint),
@@ -67,17 +84,25 @@ class _AmapMapViewState extends State<AmapMapView> {
             ),
           ),
       },
-      polylines: widget.routePoints.length < 2
-          ? const {}
-          : {
-              Polyline(
-                points: widget.routePoints.map(_latLng).toList(growable: false),
-                width: 8,
-                color: const Color(0xff1976d2),
-                capType: CapType.round,
-                joinType: JoinType.round,
-              ),
-            },
+      polylines: {
+        if (widget.routePoints.length >= 2)
+          Polyline(
+            points: widget.routePoints.map(_latLng).toList(growable: false),
+            width: 8,
+            color: const Color(0xff1976d2),
+            capType: CapType.round,
+            joinType: JoinType.round,
+          ),
+        for (final route in widget.routes)
+          if (route.points.length >= 2)
+            Polyline(
+              points: route.points.map(_latLng).toList(growable: false),
+              width: 8,
+              color: route.color,
+              capType: CapType.round,
+              joinType: JoinType.round,
+            ),
+      },
       privacyStatement: const AMapPrivacyStatement(
         hasContains: true,
         hasShow: true,
@@ -147,7 +172,11 @@ class _AmapMapViewState extends State<AmapMapView> {
 
 List<GeoPoint> _cameraPoints(AmapMapView map) {
   if (map.viewportPoints.isNotEmpty) return map.viewportPoints;
-  if (map.routePoints.isNotEmpty) return map.routePoints;
+  final routePoints = <GeoPoint>[
+    ...map.routePoints,
+    for (final route in map.routes) ...route.points,
+  ];
+  if (routePoints.isNotEmpty) return routePoints;
   return map.markers;
 }
 

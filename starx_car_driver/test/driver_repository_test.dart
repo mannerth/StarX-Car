@@ -82,7 +82,7 @@ void main() {
 
       await repository.acceptOrder('ORD-4');
       await repository.arrive('ORD-4');
-      await repository.startService('ORD-4');
+      await repository.startService('ORD-4', phoneTail: '1234');
       final result = await repository.complete('ORD-4');
 
       expect(api.calls.map((call) => '${call.method} ${call.path}'), [
@@ -91,6 +91,14 @@ void main() {
         'POST /orders/ORD-4/start-service',
         'POST /orders/ORD-4/complete',
       ]);
+      expect(
+        api.calls
+            .firstWhere(
+              (call) => '${call.method} ${call.path}' == 'POST /orders/ORD-4/start-service',
+            )
+            .data,
+        {'phoneTail': '1234'},
+      );
       expect(result.waitingDurationS, 420);
       expect(result.fare.totalFare, '18.50');
     },
@@ -185,3 +193,5 @@ class RecordingApiClient extends ApiClient {
     return responses['DELETE $path'];
   }
 }
+
+

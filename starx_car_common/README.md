@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-公共认证、网络基础设施和高德 Android 地图/定位/驾车路线适配已经可供两个 Android App 使用；订单展示模型、GCJ-02 校验、高德外部导航、POI 搜索和逆地理编码均已加入 common。订单流程仍由角色端实现。包级静态检查和单元测试均已通过。
+公共认证、网络基础设施和高德 Android 地图/定位/驾车/步行路线适配以及定位权限请求已经可供两个 Android App 使用；订单展示模型、GCJ-02 校验、高德外部导航、POI 搜索和逆地理编码均已加入 common。订单流程仍由角色端实现。包级静态检查和单元测试均已通过。
 
 ## 已实现能力
 
@@ -39,9 +39,10 @@
 - 本地 vendor 的 `amap_flutter_map`、`amap_flutter_location` 和 `amap_flutter_base` 适配 Flutter 3.44；底层仍使用高德官方 Android SDK。
 - 本地 `amap_flutter_map` 已移除地图加载完成时调试分支中的无效空数组访问，地图首次启动不再固定打印 `ArrayIndexOutOfBoundsException`。
 - `amap_flutter_location` 使用定位 SDK 6.5.1，兼顾新版 Android 兼容修复与 x86_64 模拟器运行能力。
-- `AmapMapView` 接受 GCJ-02 标记和可选路线折线；标记、路线或定位点变化后会自动居中，多个点会自动缩放至完整可见。地图已注册手势识别器，即使嵌入 `ListView` 等滚动容器仍支持拖动、缩放、旋转和倾斜操控。`AmapLocationService` 支持持续定位流和一次性当前位置请求，定位只请求坐标，不额外调用地址解析服务或消耗逆地理编码配额。
+- `AmapMapView` 接受 GCJ-02 标记、主路线折线和多条不同颜色的路线折线；标记、路线或定位点变化后会自动居中，多个点会自动缩放至完整可见，调用方可指定 `viewportPoints` 控制视野以某条路线为主。地图已注册手势识别器，即使嵌入 `ListView` 等滚动容器仍支持拖动、缩放、旋转和倾斜操控。`AmapLocationService` 支持持续定位流和一次性当前位置请求，定位只请求坐标，不额外调用地址解析服务或消耗逆地理编码配额。
+- `AmapPermissionService` 通过 common 的 Android 插件通道查询和申请前台定位权限，返回“已授予 / 普通拒绝 / 永久拒绝”结果；乘客端登录后和司机端上线前可据此主动拉起系统授权，不再依赖高德定位 SDK 的被动失败提示。
 - `AmapNavigationService` 只负责打开已安装的高德地图进行驾车导航，调用方负责订单状态和位置上报策略。
-- `AmapRouteService` 通过官方 Android 路线 SDK 返回距离、时长和 GCJ-02 折线；不使用 Web Service Key。
+- `AmapRouteService` 通过官方 Android 路线 SDK 返回驾车与步行路线的距离、时长和 GCJ-02 折线；不使用 Web Service Key。
 - `AmapSearchService` 支持 POI 搜索和逆地理编码：有定位城市时先在同城搜索并按当前位置距离排序，同城无结果自动进行全国搜索；结果携带城市、区县和可用距离并转换为 `Place`。
 
 ## 职责边界
@@ -87,3 +88,4 @@ fvm flutter test
 - 高德 POI、逆地理编码和路线搜索的更多策略（当前已支持基础搜索、逆地理编码和驾车路线）。
 - WebSocket 的连接、重连、心跳和通用事件信封。
 - 分页及更多跨角色展示模型。
+

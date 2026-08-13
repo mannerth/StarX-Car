@@ -8,6 +8,8 @@ import org.mannerth.starxcar.car.CarMapper;
 import org.mannerth.starxcar.constant.UserType;
 import org.mannerth.starxcar.driver.Driver;
 import org.mannerth.starxcar.driver.DriverMapper;
+import org.mannerth.starxcar.passenger.Passenger;
+import org.mannerth.starxcar.passenger.PassengerMapper;
 import org.mannerth.starxcar.order.response.FareQuoteResponse;
 import org.mannerth.starxcar.order.response.OrderDetailResponse;
 import org.mannerth.starxcar.order.response.OrderDriverResponse;
@@ -27,14 +29,17 @@ public class OrderQueryServiceImpl implements OrderQueryService {
     private final OrderAccessService orderAccessService;
     private final DriverMapper driverMapper;
     private final CarMapper carMapper;
+    private final PassengerMapper passengerMapper;
 
     public OrderQueryServiceImpl(RideOrderMapper rideOrderMapper, RideOrderEventMapper rideOrderEventMapper,
-                                 OrderAccessService orderAccessService, DriverMapper driverMapper, CarMapper carMapper) {
+                                 OrderAccessService orderAccessService, DriverMapper driverMapper, CarMapper carMapper,
+                                 PassengerMapper passengerMapper) {
         this.rideOrderMapper = rideOrderMapper;
         this.rideOrderEventMapper = rideOrderEventMapper;
         this.orderAccessService = orderAccessService;
         this.driverMapper = driverMapper;
         this.carMapper = carMapper;
+        this.passengerMapper = passengerMapper;
     }
 
     @Override
@@ -72,8 +77,9 @@ public class OrderQueryServiceImpl implements OrderQueryService {
                 order.getPickupAddress(), order.getPickupLat(), order.getPickupLng(), order.getDestinationPoiId(),
                 order.getDestinationName(), order.getDestinationAddress(), order.getDestinationLat(), order.getDestinationLng(),
                 order.getEstimatedDistanceM(), order.getEstimatedDurationS(), order.getBillingDistanceM(),
-                order.getActualDurationS(), order.getWaitingDurationS(), toFare(order), !isFinalFare(order), driver(order),
-                order.getCreatedTime(), order.getAcceptedTime(), order.getDriverArrivedTime(), order.getServiceStartedTime(),
+                order.getActualDurationS(), order.getWaitingDurationS(), toFare(order), !isFinalFare(order),
+                passengerPhoneTail(order), driver(order), order.getCreatedTime(), order.getAcceptedTime(),
+                order.getDriverArrivedTime(), order.getServiceStartedTime(),
                 order.getCompletedTime(), order.getCancelledTime(), order.getCancelledBy(), order.getCancelReason(), events);
     }
 
@@ -83,6 +89,14 @@ public class OrderQueryServiceImpl implements OrderQueryService {
                 order.getOrderNo(), order.getStatus(), order.getPickupName(), order.getDestinationName(),
                 order.getTotalFare(), order.getCreatedTime(), !isFinalFare(order))).toList();
         return new OrderPageResponse(result.getCurrent(), result.getSize(), result.getTotal(), records);
+    }
+
+    private String passengerPhoneTail(RideOrder order) {
+        if (order.getPassengerId() == null) {
+            return null;
+        }
+        Passenger passenger = passengerMapper.selectById(order.getPassengerId());
+        return passenger == null ? null : passenger.getPhoneTail();
     }
 
     private OrderDriverResponse driver(RideOrder order) {
@@ -104,3 +118,4 @@ public class OrderQueryServiceImpl implements OrderQueryService {
         return order.getStatus() == OrderStatus.COMPLETED;
     }
 }
+

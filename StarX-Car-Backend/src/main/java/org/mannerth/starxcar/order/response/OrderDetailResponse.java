@@ -28,6 +28,7 @@ public record OrderDetailResponse(
         Long waitingDurationS,
         FareQuoteResponse fare,
         boolean estimatedFare,
+        @Schema(description = "乘客手机尾号（后四位）；司机开始服务前用于身份核对", example = "1234") String passengerPhoneTail,
         OrderDriverResponse driver,
         LocalDateTime createdTime,
         LocalDateTime acceptedTime,
@@ -43,3 +44,4 @@ public record OrderDetailResponse(
         events = List.copyOf(events);
     }
 }
+

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:starx_car_common/starx_car_common.dart';
 
@@ -113,19 +114,19 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
             icon: const Icon(Icons.place_outlined),
             label: const Text('确认已到达'),
           ),
-        if (order.status == OrderStatus.driverArrived)
+        if (order.status == OrderStatus.driverArrived) ...[
+          const Divider(height: 8),
+          _InfoRow(
+            label: '乘客手机尾号',
+            value: order.passengerPhoneTail ?? '未提供',
+          ),
+          const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: _busy
-                ? null
-                : () => _confirmAndRun(
-                    '确认乘客已上车并开始服务？',
-                    () => ref
-                        .read(driverRepositoryProvider)
-                        .startService(order.orderNo),
-                  ),
+            onPressed: _busy ? null : () => _confirmStartService(order),
             icon: const Icon(Icons.play_arrow),
             label: const Text('开始服务'),
           ),
+        ],
         if (order.status == OrderStatus.inService)
           FilledButton.icon(
             onPressed: _busy ? null : () => _confirmComplete(order.orderNo),
@@ -172,6 +173,66 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
     );
     if (confirmed != true || !mounted) return;
     await _run(action);
+  }
+
+  Future<void> _confirmStartService(OrderDetail order) async {
+    final expected = order.passengerPhoneTail;
+    if (expected == null || expected.length != 4) {
+      _showMessage('订单缺少乘客手机尾号，无法核对乘客身份。');
+      return;
+    }
+    final controller = TextEditingController();
+    final confirmed = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('核对乘客尾号'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('请向乘客确认手机尾号（后四位）并输入，核对一致后才能开始服务。'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: '乘客手机尾号',
+                hintText: '例如 1234',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (_) =>
+                  Navigator.pop(dialogContext, controller.text.trim()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('确认开始服务'),
+          ),
+        ],
+      ),
+    );
+    Future<void>.delayed(const Duration(milliseconds: 300), controller.dispose);
+    final tail = confirmed?.trim() ?? '';
+    if (tail.length != 4 || !mounted) return;
+    if (tail != expected) {
+      _showMessage('乘客手机尾号不一致，请与乘客重新核对后再开始服务。');
+      return;
+    }
+    await _run(
+      () => ref
+          .read(driverRepositoryProvider)
+          .startService(order.orderNo, phoneTail: tail),
+    );
   }
 
   Future<void> _confirmComplete(String orderNo) async {
@@ -325,3 +386,5 @@ String _statusLabel(OrderStatus status) => switch (status) {
 };
 
 int _minutes(int seconds) => (seconds / 60).ceil();
+
+

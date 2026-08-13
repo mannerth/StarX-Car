@@ -258,6 +258,7 @@ class OrderDetail {
     this.waitingDurationS,
     required this.fare,
     required this.estimatedFare,
+    this.passengerPhoneTail,
     this.driver,
     this.createdTime,
     this.acceptedTime,
@@ -281,6 +282,10 @@ class OrderDetail {
   final int? waitingDurationS;
   final FareQuote fare;
   final bool estimatedFare;
+
+  /// The passenger's last four phone digits, used by the driver to confirm
+  /// the passenger identity before starting service.
+  final String? passengerPhoneTail;
   final OrderDriver? driver;
   final DateTime? createdTime;
   final DateTime? acceptedTime;
@@ -304,6 +309,7 @@ class OrderDetail {
     waitingDurationS: (json['waitingDurationS'] as num?)?.toInt(),
     fare: FareQuote.fromJson(json['fare'] as Map<String, dynamic>),
     estimatedFare: json['estimatedFare'] as bool? ?? true,
+    passengerPhoneTail: json['passengerPhoneTail'] as String?,
     driver: (json['driver'] as Map<String, dynamic>?) == null
         ? null
         : OrderDriver.fromJson(json['driver'] as Map<String, dynamic>),
@@ -394,3 +400,5 @@ class OrderCompletionResult {
         fare: FareQuote.fromJson(json['fare'] as Map<String, dynamic>),
       );
 }
+
+

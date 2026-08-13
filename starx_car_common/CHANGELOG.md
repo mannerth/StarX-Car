@@ -55,4 +55,10 @@
 - Add common API response, authentication session, and map location models.
 ## Unreleased
 
+- 新增 `AmapPermissionService` 与 Android 插件定位权限通道：可查询前台定位权限状态、主动请求 `ACCESS_FINE_LOCATION`，并区分“已授予 / 普通拒绝 / 永久拒绝”，供两个角色端登录后主动申请定位权限。
+- `AmapMapView` 支持多条不同颜色的路线折线（`routes`），用于接驾阶段同时绘制司机驾车路线与乘客步行路线；`viewportPoints` 仍可指定以哪条路线为主进行视野缩放。
+- `AmapRouteService` 新增 `planWalking` 步行路线规划，`AmapWalkingRoute` 模型解析高德步行路线的距离、时长与 GCJ-02 折线。
+- `OrderDetail` 增加 `passengerPhoneTail` 字段（乘客手机尾号后四位），供司机端开始服务前核对乘客身份。
+
 - 高德定位插件启动时从应用清单读取 `com.amap.api.v2.apikey` 并显式设置定位 SDK，避免 Android 初始化时序导致 Key 未生效。
+

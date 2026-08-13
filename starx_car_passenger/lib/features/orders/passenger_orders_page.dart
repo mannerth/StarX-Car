@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -57,39 +58,171 @@ final passengerOrderDetailProvider = StreamProvider.autoDispose
       }
     });
 
-final passengerDriverLocationProvider = StreamProvider.autoDispose
-    .family<DriverLocation, String>((ref, orderNo) async* {
-      ref.watch(passengerAuthProvider);
-      final repository = ref.read(passengerOrderRepositoryProvider);
-      final cancelToken = CancelToken();
-      ref.onDispose(
-        () => cancelToken.cancel('driver location provider disposed'),
-      );
-      var failureCount = 0;
-      while (true) {
-        await _waitForForeground();
-        try {
-          yield await repository.driverLocation(
-            orderNo,
-            cancelToken: cancelToken,
+typedef _ApproachRequest = ({
+  String orderNo,
+  double pickupLat,
+  double pickupLng,
+});
+
+/// Combined data for the driver-approaching phase: the latest driver
+/// location, the driving route from the driver to the pickup, the passenger's
+/// walking route to the pickup, and any planning/location errors.
+class _PassengerApproachData {
+  const _PassengerApproachData({
+    required this.driverLocation,
+    this.passengerLocation,
+    this.driverRoute,
+    this.walkingRoute,
+    this.driverRouteError,
+    this.walkingRouteError,
+    this.locationError,
+    this.nearPickup = false,
+  });
+
+  final DriverLocation driverLocation;
+  final GeoPoint? passengerLocation;
+  final AmapDrivingRoute? driverRoute;
+  final AmapWalkingRoute? walkingRoute;
+  final String? driverRouteError;
+  final String? walkingRouteError;
+  final String? locationError;
+  final bool nearPickup;
+}
+
+final passengerApproachProvider = StreamProvider.autoDispose
+    .family<_PassengerApproachData, _ApproachRequest>(
+      (ref, request) async* {
+        ref.watch(passengerAuthProvider);
+        final repository = ref.read(passengerOrderRepositoryProvider);
+        final routeService = const AmapRouteService();
+        final cancelToken = CancelToken();
+        final locationService = AmapLocationService();
+        ref.onDispose(() {
+          cancelToken.cancel('approach provider disposed');
+          unawaited(locationService.dispose());
+        });
+        final pickup = GeoPoint(
+          latitude: request.pickupLat,
+          longitude: request.pickupLng,
+        );
+        GeoPoint? passengerLocation;
+        bool located = false;
+        bool locating = false;
+        GeoPoint? plannedDriverOrigin;
+        DateTime? plannedDriverAt;
+        AmapDrivingRoute? driverRoute;
+        String? driverRouteError;
+        GeoPoint? plannedWalkOrigin;
+        DateTime? plannedWalkAt;
+        AmapWalkingRoute? walkingRoute;
+        String? walkingRouteError;
+        String? locationError;
+        var failureCount = 0;
+        while (true) {
+          await _waitForForeground();
+          if (!located && !locating) {
+            locating = true;
+            try {
+              final update = await locationService.locateOnce();
+              if (update.point != null) {
+                passengerLocation = update.point;
+                locationError = null;
+              } else {
+                locationError =
+                    update.errorMessage ?? '无法获取当前位置，请检查定位权限和 GPS。';
+              }
+            } on Object {
+              locationError = '无法获取当前位置，请检查定位权限和 GPS。';
+            } finally {
+              locating = false;
+            }
+            located = true;
+          }
+          late final DriverLocation driverLocation;
+          try {
+            driverLocation = await repository.driverLocation(
+              request.orderNo,
+              cancelToken: cancelToken,
+            );
+            failureCount = 0;
+          } on ApiException catch (error) {
+            if (error.cancelled) return;
+            if (error.statusCode == 404 || error.statusCode == 409) return;
+            failureCount++;
+            if (failureCount >= _maxPollingFailures) rethrow;
+            await _pollRetryDelay(failureCount);
+            continue;
+          } on Object {
+            failureCount++;
+            if (failureCount >= _maxPollingFailures) rethrow;
+            await _pollRetryDelay(failureCount);
+            continue;
+          }
+          final now = DateTime.now();
+          final driverDistanceMoved = plannedDriverOrigin == null
+              ? double.infinity
+              : _distanceM(plannedDriverOrigin, driverLocation.point);
+          final driverSecondsSincePlan = plannedDriverAt == null
+              ? double.infinity
+              : now.difference(plannedDriverAt).inSeconds;
+          final shouldRefreshDriverRoute = driverRoute == null
+              ? plannedDriverAt == null || driverSecondsSincePlan >= 30
+              : driverDistanceMoved >= 100 || driverSecondsSincePlan >= 30;
+          if (shouldRefreshDriverRoute) {
+            plannedDriverAt = now;
+            try {
+              driverRoute = await routeService.planDriving(
+                origin: driverLocation.point,
+                destination: pickup,
+              );
+              plannedDriverOrigin = driverLocation.point;
+              driverRouteError = null;
+            } on Object {
+              driverRouteError = '司机路线暂不可用';
+            }
+          }
+          final passengerPoint = passengerLocation;
+          final walkDistance = passengerPoint == null
+              ? double.infinity
+              : _distanceM(passengerPoint, pickup);
+          final nearPickup = passengerPoint != null && walkDistance < 50;
+          final walkSecondsSincePlan = plannedWalkAt == null
+              ? double.infinity
+              : now.difference(plannedWalkAt).inSeconds;
+          final walkMoved = passengerPoint == null ||
+              plannedWalkOrigin == null ||
+              _distanceM(plannedWalkOrigin, passengerPoint) >= 100;
+          final shouldRefreshWalkRoute = !nearPickup &&
+              (walkingRoute == null ||
+                  walkMoved ||
+                  walkSecondsSincePlan >= 120);
+          if (shouldRefreshWalkRoute && passengerPoint != null) {
+            plannedWalkAt = now;
+            try {
+              walkingRoute = await routeService.planWalking(
+                origin: passengerPoint,
+                destination: pickup,
+              );
+              plannedWalkOrigin = passengerPoint;
+              walkingRouteError = null;
+            } on Object {
+              walkingRouteError = '步行路线暂不可用';
+            }
+          }
+          yield _PassengerApproachData(
+            driverLocation: driverLocation,
+            passengerLocation: passengerPoint,
+            driverRoute: driverRoute,
+            walkingRoute: walkingRoute,
+            driverRouteError: driverRouteError,
+            walkingRouteError: walkingRouteError,
+            locationError: locationError,
+            nearPickup: nearPickup,
           );
-          failureCount = 0;
-        } on ApiException catch (error) {
-          if (error.cancelled) return;
-          if (error.statusCode == 404 || error.statusCode == 409) return;
-          failureCount++;
-          if (failureCount >= _maxPollingFailures) rethrow;
-          await _pollRetryDelay(failureCount);
-          continue;
-        } on Object {
-          failureCount++;
-          if (failureCount >= _maxPollingFailures) rethrow;
-          await _pollRetryDelay(failureCount);
-          continue;
+          await Future<void>.delayed(const Duration(seconds: 4));
         }
-        await Future<void>.delayed(const Duration(seconds: 4));
-      }
-    });
+      },
+    );
 
 final passengerRouteContextProvider = FutureProvider.autoDispose
     .family<RouteContext, String>((ref, orderNo) {
@@ -441,7 +574,11 @@ class _OrderDetailContent extends ConsumerWidget {
         const SizedBox(height: 16),
         if (order.status == OrderStatus.accepted ||
             order.status == OrderStatus.driverArrived)
-          _DriverLocationPanel(orderNo: order.orderNo),
+          _ApproachPanel(
+            orderNo: order.orderNo,
+            pickup: order.pickup,
+            driverArrived: order.status == OrderStatus.driverArrived,
+          ),
         if (order.status == OrderStatus.inService)
           _RoutePanel(orderNo: order.orderNo),
         _PlaceRow(icon: Icons.trip_origin, label: '上车点', place: order.pickup),
@@ -537,22 +674,34 @@ class _OrderDetailContent extends ConsumerWidget {
   }
 }
 
-class _DriverLocationPanel extends ConsumerWidget {
-  const _DriverLocationPanel({required this.orderNo});
+class _ApproachPanel extends ConsumerWidget {
+  const _ApproachPanel({
+    required this.orderNo,
+    required this.pickup,
+    required this.driverArrived,
+  });
+
   final String orderNo;
+  final Place pickup;
+  final bool driverArrived;
+
+  _ApproachRequest get _request => (
+    orderNo: orderNo,
+    pickupLat: pickup.location.latitude,
+    pickupLng: pickup.location.longitude,
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final location = ref.watch(passengerDriverLocationProvider(orderNo));
-    return location.when(
+    final approach = ref.watch(passengerApproachProvider(_request));
+    return approach.when(
       loading: () => const LinearProgressIndicator(),
       error: (error, _) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(error is ApiException ? error.message : '暂无司机位置'),
+          Text(error is ApiException ? error.message : '接驾信息暂不可用，请稍后重试'),
           OutlinedButton.icon(
-            onPressed: () =>
-                ref.invalidate(passengerDriverLocationProvider(orderNo)),
+            onPressed: () => ref.invalidate(passengerApproachProvider(_request)),
             icon: const Icon(Icons.refresh),
             label: const Text('重试'),
           ),
@@ -562,21 +711,65 @@ class _DriverLocationPanel extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: 220,
+            height: 260,
             child: AmapMapView(
-              initialPoint: value.point,
-              markers: [value.point],
+              initialPoint: value.driverLocation.point,
+              markers: [pickup.location, value.driverLocation.point],
+              routePoints: value.driverRoute?.points ?? const [],
+              routes: value.walkingRoute == null
+                  ? const []
+                  : [
+                      AmapMapRouteLine(
+                        points: value.walkingRoute!.points,
+                        color: const Color(0xffff9800),
+                      ),
+                    ],
+              viewportPoints: _approachViewport(value),
             ),
           ),
-          Text(
-            value.stale
-                ? '司机最后已知位置，更新时间 ${value.receivedTime ?? value.recordedTime ?? '未知'}'
-                : '司机位置已更新',
-          ),
+          const SizedBox(height: 8),
+          Text(_approachStatus(value)),
           const SizedBox(height: 12),
         ],
       ),
     );
+  }
+
+  List<GeoPoint> _approachViewport(_PassengerApproachData value) {
+    if (value.walkingRoute != null && value.walkingRoute!.points.isNotEmpty) {
+      return value.walkingRoute!.points;
+    }
+    if (value.driverRoute != null && value.driverRoute!.points.isNotEmpty) {
+      return value.driverRoute!.points;
+    }
+    return [pickup.location, value.driverLocation.point];
+  }
+
+  String _approachStatus(_PassengerApproachData value) {
+    final driverEta = value.driverRoute;
+    final walkRoute = value.walkingRoute;
+    return <String>[
+      if (driverArrived)
+        '司机已到达上车点，请尽快前往上车'
+      else if (driverEta != null)
+        '司机预计 ${_minutes(driverEta.durationS)} 分钟到达'
+      else if (value.driverRouteError != null)
+        '司机路线：${value.driverRouteError}'
+      else
+        '正在计算司机到达时间…',
+      if (value.nearPickup)
+        '您已在上车点附近'
+      else if (walkRoute != null)
+        '您步行到上车点约 ${walkRoute.distanceM} 米 · ${_minutes(walkRoute.durationS)} 分钟'
+      else if (value.walkingRouteError != null)
+        '步行路线：${value.walkingRouteError}'
+      else if (value.locationError != null)
+        value.locationError!
+      else
+        '正在计算您到上车点的步行路线…',
+      if (value.driverLocation.stale)
+        '司机位置更新于 ${value.driverLocation.receivedTime ?? value.driverLocation.recordedTime ?? '未知'}，以上路线基于最后已知位置',
+    ].where((line) => line.isNotEmpty).join('\n');
   }
 }
 
@@ -818,3 +1011,6 @@ Future<void> _waitForForeground() async {
 bool get _isForeground =>
     WidgetsBinding.instance.lifecycleState == null ||
     WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+
+

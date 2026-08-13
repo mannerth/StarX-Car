@@ -147,7 +147,8 @@ class OrderDatabaseSmokeIT {
         // Keep the smoke test fast while exercising the post-free waiting-time calculation branch.
         arrived.setDriverArrivedTime(LocalDateTime.now(BUSINESS_ZONE).minusSeconds(301));
         assertThat(orderMapper.updateById(arrived)).isEqualTo(1);
-        lifecycleService.startService(driverUser.getId(), created.orderNo());
+        String passengerTail = suffix.substring(4, 8);
+        lifecycleService.startService(driverUser.getId(), created.orderNo(), passengerTail);
         RideRouteContextResponse routeContext = tripLocationService.getRouteContext(passengerUser.getId(), created.orderNo());
         assertThat(routeContext.destinationName()).isEqualTo("目的地");
         assertThat(routeContext.driverLocation().latitude()).isEqualByComparingTo("39.916527");
@@ -280,3 +281,4 @@ class OrderDatabaseSmokeIT {
         return new PricingTierWriteRequest(type, start, end, unit, new BigDecimal(price), RoundingMode.CEIL, sort);
     }
 }
+

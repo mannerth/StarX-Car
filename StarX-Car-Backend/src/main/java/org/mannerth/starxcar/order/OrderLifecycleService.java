@@ -10,5 +10,9 @@ public interface OrderLifecycleService {
 
     OrderStatusTransitionResponse markDriverArrived(Long driverId, String orderNo);
 
-    OrderStatusTransitionResponse startService(Long driverId, String orderNo);
+    /**
+     * Starts service for a DRIVER_ARRIVED order after verifying the passenger's
+     * four-digit phone tail. A null or mismatching tail is rejected with 400.
+     */
+    OrderStatusTransitionResponse startService(Long driverId, String orderNo, String phoneTail);
 }

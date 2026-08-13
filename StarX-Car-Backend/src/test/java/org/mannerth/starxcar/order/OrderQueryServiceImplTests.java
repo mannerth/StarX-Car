@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.mannerth.starxcar.car.CarMapper;
 import org.mannerth.starxcar.constant.UserType;
 import org.mannerth.starxcar.driver.DriverMapper;
+import org.mannerth.starxcar.passenger.PassengerMapper;
 import org.mannerth.starxcar.order.response.OrderDetailResponse;
 import org.mannerth.starxcar.order.response.OrderPageResponse;
 
@@ -30,7 +31,7 @@ class OrderQueryServiceImplTests {
         eventMapper = mock(RideOrderEventMapper.class);
         accessService = mock(OrderAccessService.class);
         service = new OrderQueryServiceImpl(rideOrderMapper, eventMapper, accessService, mock(DriverMapper.class),
-                mock(CarMapper.class));
+                mock(CarMapper.class), mock(PassengerMapper.class));
     }
 
     @Test
@@ -90,3 +91,4 @@ class OrderQueryServiceImplTests {
         return order;
     }
 }
+

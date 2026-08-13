@@ -39,7 +39,24 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _locate(initial: true));
+    // 登录后首次进入叫车页先请求定位权限，再发起首次定位；
+    // 避免高德定位 SDK 因未授权直接失败而需要用户手动去系统设置开启。
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _requestPermissionAndLocate(),
+    );
+  }
+
+  Future<void> _requestPermissionAndLocate() async {
+    final status = await const AmapPermissionService().requestLocation();
+    if (!mounted) return;
+    switch (status) {
+      case LocationPermissionStatus.granted:
+        await _locate(initial: true);
+      case LocationPermissionStatus.denied:
+        _showMessage('未获得定位权限，将无法自动定位当前位置，可在页面右下角重试。');
+      case LocationPermissionStatus.permanentlyDenied:
+        _showMessage('定位权限已被永久拒绝，请到系统设置中开启定位权限。');
+    }
   }
 
   @override
@@ -648,3 +665,4 @@ class _SearchMessage extends StatelessWidget {
     ),
   );
 }
+

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-13
+
+### 乘客身份核对与接驾信息
+
+- 订单详情 `GET /api/orders/{orderNo}` 响应新增 `passengerPhoneTail`（乘客手机尾号后四位），供司机端开始服务前核对乘客身份；直接复用现有 `passenger.phone_tail`，没有新增或修改数据库表、字段和索引。
+- `POST /api/orders/{orderNo}/start-service` 请求体新增必填 `phoneTail`（4 位数字）；服务端与乘客资料尾号核对一致后才写入开始时间、计算等待秒数并转入 `IN_SERVICE`，尾号缺失、格式错误或与乘客不一致时返回 400，防止司机未经身份核对开始服务。同步更新 OpenAPI 注解、MockMvc 控制器测试、服务单元测试与数据库烟测。
+
 ## 2026-08-08
 
 ### 管理员司机审核
@@ -144,3 +151,4 @@
 - 车辆创建、绑定、解绑和停用流程同步维护 `driver_car_binding`，并继续维护 `driver.car_id` 以兼容现有查询；物理删除车辆改为标记 `disabled`，保留绑定历史。
 - 账号状态为 `disabled` 或 `cancelled` 时拒绝登录和刷新令牌。
 - 在管理端和两端 Flutter 客户端切换至拆分车牌请求后，移除 `CarRequest` 中旧版 `carNumber` 入参；完整车牌仍由服务端生成并持久化。
+

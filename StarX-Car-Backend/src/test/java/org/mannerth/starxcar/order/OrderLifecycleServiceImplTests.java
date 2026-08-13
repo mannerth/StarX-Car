@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.apache.ibatis.annotations.Update;
 import org.mannerth.starxcar.driver.DriverMapper;
 import org.mannerth.starxcar.order.response.OrderStatusTransitionResponse;
+import org.mannerth.starxcar.passenger.Passenger;
+import org.mannerth.starxcar.passenger.PassengerMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -37,6 +39,7 @@ class OrderLifecycleServiceImplTests {
     private RideOrderEventMapper eventMapper;
     private DriverMapper driverMapper;
     private DriverLocationMapper locationMapper;
+    private PassengerMapper passengerMapper;
     private OrderAccessService accessService;
     private OrderLifecycleService service;
 
@@ -46,9 +49,10 @@ class OrderLifecycleServiceImplTests {
         eventMapper = mock(RideOrderEventMapper.class);
         driverMapper = mock(DriverMapper.class);
         locationMapper = mock(DriverLocationMapper.class);
+        passengerMapper = mock(PassengerMapper.class);
         accessService = mock(OrderAccessService.class);
-        service = new OrderLifecycleServiceImpl(orderMapper, eventMapper, driverMapper, locationMapper, accessService,
-                Clock.fixed(NOW_INSTANT, ZoneId.of("Asia/Shanghai")));
+        service = new OrderLifecycleServiceImpl(orderMapper, eventMapper, driverMapper, locationMapper, passengerMapper,
+                accessService, Clock.fixed(NOW_INSTANT, ZoneId.of("Asia/Shanghai")));
     }
 
     @Test
@@ -130,16 +134,31 @@ class OrderLifecycleServiceImplTests {
         RideOrder order = order(OrderStatus.DRIVER_ARRIVED, 2L, 7L);
         order.setDriverArrivedTime(NOW.minusSeconds(301));
         given(accessService.requireDriverOrder("O1", 2L)).willReturn(order);
+        given(passengerMapper.selectById(1L)).willReturn(passenger("1234"));
         given(orderMapper.startService(10L, 2L, 7L, NOW, 301L)).willReturn(1);
         given(eventMapper.insert(any(RideOrderEvent.class))).willReturn(1);
 
-        OrderStatusTransitionResponse result = service.startService(2L, "O1");
+        OrderStatusTransitionResponse result = service.startService(2L, "O1", "1234");
 
         assertThat(result.status()).isEqualTo(OrderStatus.IN_SERVICE);
         assertThat(result.waitingDurationS()).isEqualTo(301L);
         org.mockito.ArgumentCaptor<RideOrderEvent> event = org.mockito.ArgumentCaptor.forClass(RideOrderEvent.class);
         verify(eventMapper).insert(event.capture());
         assertThat(event.getValue().getEventType()).isEqualTo(OrderEventType.START_SERVICE);
+    }
+
+    @Test
+    void startServiceRejectsWrongPassengerPhoneTailBeforeWritingEvent() {
+        RideOrder order = order(OrderStatus.DRIVER_ARRIVED, 2L, 7L);
+        order.setDriverArrivedTime(NOW.minusSeconds(60));
+        given(accessService.requireDriverOrder("O1", 2L)).willReturn(order);
+        given(passengerMapper.selectById(1L)).willReturn(passenger("5678"));
+
+        assertThatThrownBy(() -> service.startService(2L, "O1", "1234"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("乘客手机尾号校验失败");
+        verify(orderMapper, never()).startService(anyLong(), anyLong(), anyLong(), any(), anyLong());
+        verify(eventMapper, never()).insert(any(RideOrderEvent.class));
     }
 
     @Test
@@ -153,7 +172,8 @@ class OrderLifecycleServiceImplTests {
 
         order.setStatus(OrderStatus.DRIVER_ARRIVED);
         order.setDriverArrivedTime(NOW.plusSeconds(1));
-        assertConflict(() -> service.startService(2L, "O1"));
+        given(passengerMapper.selectById(1L)).willReturn(passenger("1234"));
+        assertConflict(() -> service.startService(2L, "O1", "1234"));
         verify(orderMapper, never()).startService(anyLong(), anyLong(), anyLong(), any(), anyLong());
     }
 
@@ -165,7 +185,7 @@ class OrderLifecycleServiceImplTests {
                 .isAnnotationPresent(Transactional.class)).isTrue();
         assertThat(OrderLifecycleServiceImpl.class.getMethod("markDriverArrived", Long.class, String.class)
                 .isAnnotationPresent(Transactional.class)).isTrue();
-        assertThat(OrderLifecycleServiceImpl.class.getMethod("startService", Long.class, String.class)
+        assertThat(OrderLifecycleServiceImpl.class.getMethod("startService", Long.class, String.class, String.class)
                 .isAnnotationPresent(Transactional.class)).isTrue();
     }
 
@@ -220,6 +240,13 @@ class OrderLifecycleServiceImplTests {
         assertThat(sql).contains(snippets);
     }
 
+    private Passenger passenger(String phoneTail) {
+        Passenger passenger = new Passenger();
+        passenger.setId(1L);
+        passenger.setPhoneTail(phoneTail);
+        return passenger;
+    }
+
     private RideOrder order(OrderStatus status, Long driverId, Long version) {
         RideOrder order = new RideOrder();
         order.setId(10L);
@@ -236,3 +263,6 @@ class OrderLifecycleServiceImplTests {
                 exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
     }
 }
+
+
+

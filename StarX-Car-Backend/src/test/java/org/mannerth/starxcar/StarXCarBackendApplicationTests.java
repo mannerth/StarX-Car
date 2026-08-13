@@ -526,7 +526,7 @@ class StarXCarBackendApplicationTests {
         given(orderLifecycleService.markDriverArrived(1L, "O20260805002"))
                 .willReturn(new OrderStatusTransitionResponse("O20260805002", OrderStatus.DRIVER_ARRIVED,
                         java.time.LocalDateTime.of(2026, 8, 5, 10, 3), null));
-        given(orderLifecycleService.startService(1L, "O20260805002"))
+        given(orderLifecycleService.startService(1L, "O20260805002", "1234"))
                 .willReturn(new OrderStatusTransitionResponse("O20260805002", OrderStatus.IN_SERVICE,
                         java.time.LocalDateTime.of(2026, 8, 5, 10, 8), 300L));
 
@@ -536,7 +536,9 @@ class StarXCarBackendApplicationTests {
                 .andExpect(jsonPath("$.data.status").value("DRIVER_ARRIVED"));
 
         mockMvc.perform(post("/api/orders/O20260805002/start-service")
-                        .header("Authorization", "Bearer " + driverToken()))
+                        .header("Authorization", "Bearer " + driverToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"phoneTail\":\"1234\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("IN_SERVICE"))
                 .andExpect(jsonPath("$.data.waitingDurationS").value(300));
@@ -726,3 +728,4 @@ class StarXCarBackendApplicationTests {
     }
 
 }
+

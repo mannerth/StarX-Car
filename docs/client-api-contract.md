@@ -198,7 +198,8 @@
 乘客只能读取自己的订单，司机只能读取自己已接订单；无权限时统一按 `404` 处理以
 避免泄露订单存在性。详情字段包括地点坐标、`estimatedDistanceM`、`estimatedDurationS`、
 `billingDistanceM`、`actualDurationS?`、`waitingDurationS?`、`fare`、`estimatedFare`、
-司机脱敏资料、各状态时间、取消信息和事件列表。
+`passengerPhoneTail`（乘客手机尾号后四位，司机开始服务前用于身份核对）、司机脱敏资料、
+各状态时间、取消信息和事件列表。
 
 ### POST `/orders/{orderNo}/cancel`
 
@@ -290,8 +291,10 @@
 
 ### POST `/orders/{orderNo}/start-service`
 
-仅已接订单司机，要求 `DRIVER_ARRIVED`；服务端写入开始时间并计算等待秒数，成功状态为
-`IN_SERVICE`，响应的 `waitingDurationS` 为服务端计算值。状态/时间异常返回 `409`。
+仅已接订单司机，要求 `DRIVER_ARRIVED`；请求体必须携带 `{"phoneTail":"1234"}`（乘客
+手机尾号后四位数字），服务端与乘客资料核对一致后写入开始时间并计算等待秒数，成功状态为
+`IN_SERVICE`，响应的 `waitingDurationS` 为服务端计算值。尾号缺失/格式错误/不匹配返回
+`400`；状态/时间异常返回 `409`。
 
 ### POST `/orders/{orderNo}/complete`
 
@@ -329,3 +332,4 @@ PENDING -> ACCEPTED -> DRIVER_ARRIVED -> IN_SERVICE -> COMPLETED
 - `API_BASE_URL`：通过 `--dart-define` 覆盖，生产必须 HTTPS。
 - `AMAP_ANDROID_KEY`：当前由两个 App 各自的 `android/amap.properties` 注入 Manifest，
   不进入 common、Dart 常量或版本库；高德控制台应限制包名和签名 SHA-1。
+

@@ -10,6 +10,7 @@ import org.mannerth.starxcar.auth.User;
 import org.mannerth.starxcar.auth.UserMapper;
 import org.mannerth.starxcar.constant.UserType;
 import org.mannerth.starxcar.order.request.OrderCancelRequest;
+import org.mannerth.starxcar.order.request.StartServiceRequest;
 import org.mannerth.starxcar.order.response.OrderStatusTransitionResponse;
 import org.mannerth.starxcar.security.CurrentUser;
 import org.springframework.http.HttpStatus;
@@ -61,13 +62,14 @@ public class OrderLifecycleController {
 
     @PostMapping("/api/orders/{orderNo}/start-service")
     @PreAuthorize("hasRole('DRIVER')")
-    @Operation(summary = "开始服务", description = "仅限已接此订单的账号有效 driver；订单必须处于 DRIVER_ARRIVED。服务端写入开始时间、以服务端时间计算等待秒数和 START_SERVICE 审计事件。")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "开始服务成功"), @ApiResponse(responseCode = "401", description = "未登录"), @ApiResponse(responseCode = "403", description = "非司机角色或账号不可用"), @ApiResponse(responseCode = "404", description = "订单不存在或不属于当前司机"), @ApiResponse(responseCode = "409", description = "订单状态或到达时间异常，不能开始服务")})
+    @Operation(summary = "开始服务", description = "仅限已接此订单的账号有效 driver；订单必须处于 DRIVER_ARRIVED。请求体需携带乘客手机尾号（后四位），服务端与乘客资料核对通过后写入开始时间、以服务端时间计算等待秒数和 START_SERVICE 审计事件；尾号缺失、格式错误或与乘客不一致时返回 400。")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "开始服务成功"), @ApiResponse(responseCode = "400", description = "乘客手机尾号缺失、格式错误或校验失败"), @ApiResponse(responseCode = "401", description = "未登录"), @ApiResponse(responseCode = "403", description = "非司机角色或账号不可用"), @ApiResponse(responseCode = "404", description = "订单不存在或不属于当前司机"), @ApiResponse(responseCode = "409", description = "订单状态或到达时间异常，不能开始服务")})
     public OrderStatusTransitionResponse startService(@AuthenticationPrincipal String principal,
-                                                       @PathVariable String orderNo) {
+                                                       @PathVariable String orderNo,
+                                                       @Valid @RequestBody(required = false) StartServiceRequest request) {
         Long userId = CurrentUser.id(principal);
         requireDriver(userId);
-        return lifecycleService.startService(userId, orderNo);
+        return lifecycleService.startService(userId, orderNo, request == null ? null : request.phoneTail());
     }
 
     private User requireActiveUser(Long userId) {
@@ -84,3 +86,4 @@ public class OrderLifecycleController {
         }
     }
 }
+

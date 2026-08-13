@@ -19,6 +19,7 @@ class AmapMapView extends StatefulWidget {
     super.key,
     required this.initialPoint,
     this.markers = const [],
+    this.markerColors = const [],
     this.routePoints = const [],
     this.routes = const [],
     this.viewportPoints = const [],
@@ -26,6 +27,10 @@ class AmapMapView extends StatefulWidget {
   });
   final GeoPoint initialPoint;
   final List<GeoPoint> markers;
+
+  /// Optional per-marker colors. When shorter than [markers], remaining
+  /// markers fall back to the default green-first/red-others scheme.
+  final List<Color> markerColors;
 
   /// Optional GCJ-02 points for the primary (blue) route polyline.
   final List<GeoPoint> routePoints;
@@ -79,9 +84,7 @@ class _AmapMapViewState extends State<AmapMapView> {
         for (var i = 0; i < widget.markers.length; i++)
           Marker(
             position: _latLng(widget.markers[i]),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              i == 0 ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
-            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(_markerHue(i)),
           ),
       },
       polylines: {
@@ -126,6 +129,13 @@ class _AmapMapViewState extends State<AmapMapView> {
               GeoPoint(latitude: point.latitude, longitude: point.longitude),
             ),
     );
+  }
+
+  double _markerHue(int index) {
+    if (index < widget.markerColors.length) {
+      return HSLColor.fromColor(widget.markerColors[index]).hue;
+    }
+    return index == 0 ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed;
   }
 
   void _moveCamera() {

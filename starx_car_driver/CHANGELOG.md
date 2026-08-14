@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- 个人中心新增「历史订单」入口：新增 `DriverOrdersHistoryPage`，按全部/已完成/已取消筛选分页查看本人历史订单，滚动自动加载更多，点击进入既有订单详情页；复用 `DriverRepository.orders` 的状态筛选与分页能力。
+
+- 个人中心新增「我的评价」入口，通过 `GET /api/drivers/me/ratings` 分页查看乘客对本人的评价（订单号、星级、文字、时间），列表顶部显示评价总数并支持下拉刷新。
+- `DriverRepository` 新增 `myRatings` 方法及 `RatingSummary`/`RatingPage` 模型；Repository 契约测试新增 1 项（评价历史分页解析）。
+
 - 司机位置上报间隔从 3 秒缩短到 2 秒，配合乘客端 2 秒位置轮询，行程中司机位置在乘客端能更及时地更新。
 
 

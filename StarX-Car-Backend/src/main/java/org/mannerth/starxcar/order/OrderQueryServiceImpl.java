@@ -105,8 +105,14 @@ public class OrderQueryServiceImpl implements OrderQueryService {
         }
         Driver driver = driverMapper.selectById(order.getDriverId());
         Car car = order.getCarId() == null ? null : carMapper.selectById(order.getCarId());
-        return new OrderDriverResponse(order.getDriverId(), driver == null ? null : driver.getDisplayPhone(),
-                car == null ? null : car.getCarNumber());
+        return new OrderDriverResponse(order.getDriverId(),
+                driver == null ? null : driver.getPhoneNumber(),
+                driver == null ? null : driver.getDisplayPhone(),
+                driver == null ? null : driver.getRating(),
+                car == null ? null : car.getCarNumber(),
+                car == null ? null : car.getBrand(),
+                car == null ? null : car.getColor(),
+                car == null ? null : car.getCarType());
     }
 
     private FareQuoteResponse toFare(RideOrder order) {

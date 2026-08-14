@@ -111,6 +111,33 @@ void main() {
 
     expect(api.lastPath, 'DELETE /drivers/me');
   });
+
+  test('myRatings sends page/size and parses the received rating history', () async {
+    final api = RecordingApiClient({
+      'GET /drivers/me/ratings': {
+        'page': 1,
+        'size': 20,
+        'total': 1,
+        'records': [
+          {
+            'orderNo': 'ORD-9',
+            'rating': 5,
+            'content': '服务很好',
+            'createdAt': '2026-08-13 12:00:00',
+          },
+        ],
+      },
+    });
+
+    final page = await DriverRepository(api).myRatings(page: 1, size: 20);
+
+    expect(api.lastPath, 'GET /drivers/me/ratings');
+    expect(api.calls.single.query, {'page': 1, 'size': 20});
+    expect(page.total, 1);
+    expect(page.records.single.orderNo, 'ORD-9');
+    expect(page.records.single.rating, 5);
+    expect(page.records.single.content, '服务很好');
+  });
 }
 
 Map<String, String> _fare() => {

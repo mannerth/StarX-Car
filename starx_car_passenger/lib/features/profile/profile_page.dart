@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
 import 'passenger_repository.dart';
+import '../orders/passenger_ratings_page.dart';
 
 final passengerRepositoryProvider = Provider<PassengerRepository>(
   (ref) => PassengerRepository(ref.read(apiClientProvider)),
@@ -130,6 +131,20 @@ class _ProfileContent extends ConsumerWidget {
                 ),
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.star_outline),
+            title: const Text('我的评价'),
+            subtitle: const Text('查看我提交过的行程评价'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const PassengerRatingsPage(),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 12),

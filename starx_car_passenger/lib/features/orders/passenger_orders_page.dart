@@ -3,10 +3,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:starx_car_common/starx_car_common.dart';
 
 import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
+import 'passenger_order_repository.dart';
 
 final passengerOrdersProvider = FutureProvider.autoDispose
     .family<OrderPage, OrderStatus?>((ref, status) {
@@ -56,6 +58,12 @@ final passengerOrderDetailProvider = StreamProvider.autoDispose
           ref.read(passengerOrderDetailPollIntervalProvider),
         );
       }
+    });
+
+final passengerOrderRatingProvider = FutureProvider.autoDispose
+    .family<OrderRating, String>((ref, orderNo) {
+      ref.watch(passengerAuthProvider);
+      return ref.read(passengerOrderRepositoryProvider).rating(orderNo);
     });
 
 typedef _ApproachRequest = ({
@@ -584,6 +592,10 @@ class _OrderDetailContent extends ConsumerWidget {
           ),
         if (order.status == OrderStatus.inService)
           _RoutePanel(orderNo: order.orderNo),
+        if (order.driver != null) ...[
+          const SizedBox(height: 12),
+          _DriverInfoCard(driver: order.driver!),
+        ],
         _PlaceRow(icon: Icons.trip_origin, label: '上车点', place: order.pickup),
         _PlaceRow(
           icon: Icons.location_on,
@@ -611,10 +623,10 @@ class _OrderDetailContent extends ConsumerWidget {
           value: '¥${order.fare.totalFare}',
           emphasized: true,
         ),
-        if (order.driver != null) ...[
+
+        if (order.status == OrderStatus.completed) ...[
           const Divider(height: 32),
-          _DetailRow(label: '司机电话', value: order.driver!.displayPhone ?? '未提供'),
-          _DetailRow(label: '接单车辆', value: order.driver!.carNumber ?? '未提供'),
+          _RatingPanel(orderNo: order.orderNo),
         ],
         if (order.events.isNotEmpty) ...[
           const Divider(height: 32),
@@ -1035,4 +1047,334 @@ bool get _isForeground =>
     WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
 
 
+/// 已完成订单的评价区：已评价时只读展示，未评价时提供 1-5 星与可选文字输入。
+class _RatingPanel extends ConsumerStatefulWidget {
+  const _RatingPanel({required this.orderNo});
 
+  final String orderNo;
+
+  @override
+  ConsumerState<_RatingPanel> createState() => _RatingPanelState();
+}
+
+class _RatingPanelState extends ConsumerState<_RatingPanel> {
+  final TextEditingController _content = TextEditingController();
+  int _score = 5;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _content.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rating = ref.watch(passengerOrderRatingProvider(widget.orderNo));
+    return rating.when(
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(8),
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      error: (error, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('评价加载失败', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () =>
+                ref.invalidate(passengerOrderRatingProvider(widget.orderNo)),
+            icon: const Icon(Icons.refresh),
+            label: const Text('重试'),
+          ),
+        ],
+      ),
+      data: (value) => value.rated
+          ? _RatingDisplay(rating: value)
+          : _RatingEditor(
+              score: _score,
+              contentController: _content,
+              submitting: _submitting,
+              onScoreChanged: (value) => setState(() => _score = value),
+              onSubmit: _submit,
+            ),
+    );
+  }
+
+  Future<void> _submit() async {
+    setState(() => _submitting = true);
+    try {
+      await ref
+          .read(passengerOrderRepositoryProvider)
+          .submitRating(widget.orderNo, rating: _score, content: _content.text);
+      ref.invalidate(passengerOrderRatingProvider(widget.orderNo));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('感谢您的评价')));
+      }
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+}
+
+class _RatingDisplay extends StatelessWidget {
+  const _RatingDisplay({required this.rating});
+
+  final OrderRating rating;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Text('我的评价', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(width: 12),
+          _StarRow(score: rating.rating ?? 0, size: 22, onChanged: null),
+        ],
+      ),
+      if (rating.content?.isNotEmpty == true) ...[
+        const SizedBox(height: 6),
+        Text(rating.content!),
+      ],
+      if (rating.createdAt != null) ...[
+        const SizedBox(height: 6),
+        Text(
+          _formatRatingTime(rating.createdAt!),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    ],
+  );
+}
+
+class _RatingEditor extends StatelessWidget {
+  const _RatingEditor({
+    required this.score,
+    required this.contentController,
+    required this.submitting,
+    required this.onScoreChanged,
+    required this.onSubmit,
+  });
+
+  final int score;
+  final TextEditingController contentController;
+  final bool submitting;
+  final ValueChanged<int> onScoreChanged;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('评价司机', style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 8),
+      _StarRow(score: score, size: 36, onChanged: onScoreChanged),
+      const SizedBox(height: 8),
+      TextField(
+        controller: contentController,
+        maxLength: 500,
+        maxLines: 3,
+        decoration: const InputDecoration(
+          hintText: '说说本次行程体验（可选）',
+          border: OutlineInputBorder(),
+        ),
+      ),
+      const SizedBox(height: 8),
+      SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: submitting ? null : onSubmit,
+          icon: const Icon(Icons.star),
+          label: Text(submitting ? '提交中…' : '提交评价'),
+        ),
+      ),
+    ],
+  );
+}
+
+/// 1-5 星展示/选择行；onChanged 为空时仅展示不可交互。
+class _StarRow extends StatelessWidget {
+  const _StarRow({required this.score, required this.size, this.onChanged});
+
+  final int score;
+  final double size;
+  final ValueChanged<int>? onChanged;
+
+  Color _starColor(int star) =>
+      star <= score ? Colors.amber : Colors.grey.shade400;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var star = 1; star <= 5; star++)
+          if (onChanged == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Icon(
+                star <= score ? Icons.star : Icons.star_border,
+                size: size,
+                color: _starColor(star),
+              ),
+            )
+          else
+            IconButton(
+              onPressed: () => onChanged!(star),
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(
+                minWidth: size + 8,
+                minHeight: size + 8,
+              ),
+              iconSize: size,
+              icon: Icon(
+                star <= score ? Icons.star : Icons.star_border,
+                color: _starColor(star),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+String _formatRatingTime(DateTime value) =>
+    value.toLocal().toString().replaceFirst('T', ' ').split('.').first;
+
+
+/// 已接单司机的信息卡：评分、脱敏手机号、车牌、车辆信息与联系司机按钮。
+class _DriverInfoCard extends StatelessWidget {
+  const _DriverInfoCard({required this.driver});
+
+  final OrderDriver driver;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.person_outline),
+              const SizedBox(width: 8),
+              Text('接单司机', style: Theme.of(context).textTheme.titleMedium),
+              const Spacer(),
+              _StarRow(score: driver.rating?.round() ?? 0, size: 16, onChanged: null),
+              const SizedBox(width: 4),
+              Text(
+                driver.rating == null
+                    ? '暂无评分'
+                    : driver.rating!.toStringAsFixed(1),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _DriverInfoRow(
+            icon: Icons.badge_outlined,
+            label: '车牌号',
+            value: driver.carNumber ?? '未提供',
+          ),
+          _DriverInfoRow(
+            icon: Icons.directions_car_outlined,
+            label: '车辆',
+            value: _vehicleLabel(),
+          ),
+          _DriverInfoRow(
+            icon: Icons.phone_outlined,
+            label: '联系电话',
+            value: driver.displayPhone ?? '未提供',
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed:
+                  driver.phoneNumber?.isNotEmpty == true ? () => _callDriver(context) : null,
+              icon: const Icon(Icons.call),
+              label: const Text('联系司机'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  String _vehicleLabel() {
+    final parts = [
+      driver.carBrand,
+      driver.carColor,
+      driver.carType,
+    ].whereType<String>().where((value) => value.isNotEmpty).toList();
+    return parts.isEmpty ? '未提供' : parts.join(' · ');
+  }
+
+  Future<void> _callDriver(BuildContext context) async {
+    final phone = driver.phoneNumber;
+    if (phone == null || phone.isEmpty) return;
+    try {
+      final opened = await launchUrl(Uri(scheme: 'tel', path: phone));
+      if (!opened && context.mounted) {
+        _showMessage(context, '无法打开拨号，请手动拨打司机电话：$phone');
+      }
+    } on Object {
+      if (context.mounted) {
+        _showMessage(context, '无法打开拨号，请手动拨打司机电话：$phone');
+      }
+    }
+  }
+
+  void _showMessage(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+}
+
+class _DriverInfoRow extends StatelessWidget {
+  const _DriverInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 64,
+          child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        ),
+        Expanded(
+          child: Text(value, textAlign: TextAlign.end),
+        ),
+      ],
+    ),
+  );
+}

@@ -28,21 +28,31 @@ import org.mannerth.starxcar.order.response.OrderCreatedResponse;
 import org.mannerth.starxcar.order.response.OrderDetailResponse;
 import org.mannerth.starxcar.order.response.OrderQuoteResponse;
 import org.mannerth.starxcar.order.response.RideRouteContextResponse;
+import org.mannerth.starxcar.order.rating.OrderRating;
+import org.mannerth.starxcar.order.rating.OrderRatingMapper;
+import org.mannerth.starxcar.order.rating.RatingService;
+import org.mannerth.starxcar.order.rating.request.RatingSubmitRequest;
+import org.mannerth.starxcar.order.rating.response.OrderRatingResponse;
+import org.mannerth.starxcar.passenger.Passenger;
 import org.mannerth.starxcar.passenger.Passenger;
 import org.mannerth.starxcar.passenger.PassengerMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.transaction.AfterTransaction;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
+
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 
@@ -92,6 +102,10 @@ class OrderDatabaseSmokeIT {
     private AdminPricingRuleService adminPricingRuleService;
     @Autowired
     private PricingRuleMapper pricingRuleMapper;
+    @Autowired
+    private RatingService ratingService;
+    @Autowired
+    private OrderRatingMapper ratingMapper;
 
     @MockitoBean
     private AmapRouteClient amapRouteClient;
@@ -101,11 +115,12 @@ class OrderDatabaseSmokeIT {
     private Long adminId;
     private Long carId;
     private Long ruleId;
+    private Long orderId;
     private String orderNo;
 
     @Test
     void persistsAndRollsBackTheImmediateRideWorkflow() {
-        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        String suffix = String.valueOf(java.util.concurrent.ThreadLocalRandom.current().nextLong(1_000_000_000L, 10_000_000_000L));
         User passengerUser = user("it-passenger-" + suffix, UserType.passenger);
         User driverUser = user("it-driver-" + suffix, UserType.driver);
         User adminUser = user("it-admin-" + suffix, UserType.admin);
@@ -155,6 +170,7 @@ class OrderDatabaseSmokeIT {
 
         completionService.complete(driverUser.getId(), created.orderNo());
         RideOrder completed = order(created.orderNo());
+        orderId = completed.getId();
         List<OrderFareItem> fareItems = fareItemMapper.selectList(Wrappers.<OrderFareItem>lambdaQuery()
                 .eq(OrderFareItem::getOrderId, completed.getId()));
         BigDecimal itemTotal = fareItems.stream().map(OrderFareItem::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -169,6 +185,28 @@ class OrderDatabaseSmokeIT {
         OrderDetailResponse driverDetail = queryService.getOrder(driverUser.getId(), UserType.driver, created.orderNo());
         assertThat(passengerDetail.fare().totalFare()).isEqualByComparingTo(completed.getTotalFare());
         assertThat(driverDetail.events()).hasSize(5);
+
+        OrderRatingResponse submitted = ratingService.submit(passengerUser.getId(), created.orderNo(),
+                new RatingSubmitRequest(5, "烟测评价"));
+        assertThat(submitted.rated()).isTrue();
+        assertThat(submitted.rating()).isEqualTo(5);
+        OrderRating persistedRating = ratingMapper.selectOne(Wrappers.<OrderRating>lambdaQuery()
+                .eq(OrderRating::getOrderId, completed.getId()));
+        assertThat(persistedRating).isNotNull();
+        assertThat(persistedRating.getPassengerId()).isEqualTo(passengerUser.getId());
+        assertThat(persistedRating.getDriverId()).isEqualTo(driverUser.getId());
+        assertThat(persistedRating.getContent()).isEqualTo("烟测评价");
+        Map<String, Object> aggregate = driverMapper.selectRatingAggregate(driverUser.getId());
+        assertThat(new BigDecimal(aggregate.get("rating").toString())).isEqualByComparingTo("5.0");
+        assertThat(new BigDecimal(aggregate.get("rating_sum").toString())).isEqualByComparingTo("5.00");
+        assertThat(((Number) aggregate.get("rating_count")).intValue()).isEqualTo(1);
+        assertThat(ratingService.getOrderRating(passengerUser.getId(), UserType.passenger, created.orderNo()).rated())
+                .isTrue();
+        assertThat(ratingService.listDriverRatings(driverUser.getId(), 1, 20).records()).hasSize(1);
+        assertThatThrownBy(() -> ratingService.submit(passengerUser.getId(), created.orderNo(),
+                new RatingSubmitRequest(4, "重复评价")))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
 
         PricingRuleResponse draft = adminPricingRuleService.create(adminUser.getId(), pricingRuleRequest("it-rule-" + suffix));
         PricingRuleResponse active = adminPricingRuleService.activate(adminUser.getId(), draft.id(),
@@ -191,6 +229,8 @@ class OrderDatabaseSmokeIT {
         assertThat(orderMapper.selectCount(Wrappers.<RideOrder>lambdaQuery().eq(RideOrder::getOrderNo, orderNo)))
                 .isZero();
         assertThat(pricingRuleMapper.selectById(ruleId)).isNull();
+        assertThat(ratingMapper.selectCount(Wrappers.<OrderRating>lambdaQuery()
+                .eq(OrderRating::getOrderId, orderId))).isZero();
     }
 
     private void insert(User user) {

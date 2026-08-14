@@ -1,0 +1,8 @@
+package org.mannerth.starxcar.order.rating;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface OrderRatingMapper extends BaseMapper<OrderRating> {
+}

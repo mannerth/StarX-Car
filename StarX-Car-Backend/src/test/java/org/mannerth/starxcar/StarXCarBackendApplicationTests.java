@@ -38,6 +38,11 @@ import org.mannerth.starxcar.order.response.OrderCompletionResponse;
 import org.mannerth.starxcar.order.response.DriverLocationResponse;
 import org.mannerth.starxcar.order.response.RideRouteContextResponse;
 import org.mannerth.starxcar.order.pricing.response.PricingRulePageResponse;
+import org.mannerth.starxcar.order.rating.OrderRatingMapper;
+import org.mannerth.starxcar.order.rating.RatingService;
+import org.mannerth.starxcar.order.rating.response.OrderRatingResponse;
+import org.mannerth.starxcar.order.rating.response.RatingPageResponse;
+import org.mannerth.starxcar.order.rating.response.RatingSummaryResponse;
 import org.mannerth.starxcar.security.JwtService;
 import org.mannerth.starxcar.passenger.PassengerMapper;
 import org.mannerth.starxcar.passenger.Passenger;
@@ -136,6 +141,12 @@ class StarXCarBackendApplicationTests {
 
     @MockitoBean
     private AdminDriverService adminDriverService;
+
+    @MockitoBean
+    private OrderRatingMapper orderRatingMapper;
+
+    @MockitoBean
+    private RatingService ratingService;
 
     @Test
     void contextLoads() {
@@ -704,6 +715,48 @@ class StarXCarBackendApplicationTests {
                 .andExpect(jsonPath("$.data").doesNotExist());
     }
 
+    @Test
+    void ratingEndpointsEnforceRolesAndAppearInOpenApi() throws Exception {
+        given(ratingService.submit(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq("O1"), any()))
+                .willReturn(new OrderRatingResponse(true, 5, "司机服务很好",
+                        java.time.LocalDateTime.of(2026, 8, 13, 12, 0)));
+        mockMvc.perform(post("/api/orders/O1/rating")
+                        .header("Authorization", "Bearer " + passengerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":5,\"content\":\"司机服务很好\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.rated").value(true))
+                .andExpect(jsonPath("$.data.rating").value(5));
+
+        mockMvc.perform(post("/api/orders/O1/rating")
+                        .header("Authorization", "Bearer " + driverToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":5}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+
+        given(ratingService.listDriverRatings(1L, 1, 20)).willReturn(new RatingPageResponse(1, 20, 1,
+                java.util.List.of(new RatingSummaryResponse("O20260813001", 5, "司机服务很好",
+                        java.time.LocalDateTime.of(2026, 8, 13, 12, 0)))));
+        mockMvc.perform(get("/api/drivers/me/ratings")
+                        .header("Authorization", "Bearer " + driverToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.records[0].orderNo").value("O20260813001"));
+
+        mockMvc.perform(get("/api/drivers/me/ratings")
+                        .header("Authorization", "Bearer " + passengerToken()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/orders/{orderNo}/rating'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/orders/{orderNo}/rating'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/drivers/me/ratings'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/passengers/me/ratings'].get").exists());
+    }
     @Test
     void openApiDocumentsBearerSecurityAndOrderRequestSchemas() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))

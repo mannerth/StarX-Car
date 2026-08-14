@@ -90,6 +90,43 @@ class PassengerOrderRepository {
     await _api.get('/orders/$orderNo/route-context', cancelToken: cancelToken)
         as Map<String, dynamic>,
   );
+
+  Future<OrderRating> rating(
+    String orderNo, {
+    CancelToken? cancelToken,
+  }) async => OrderRating.fromJson(
+    await _api.get('/orders/$orderNo/rating', cancelToken: cancelToken)
+        as Map<String, dynamic>,
+  );
+
+  Future<OrderRating> submitRating(
+    String orderNo, {
+    required int rating,
+    String? content,
+  }) async => OrderRating.fromJson(
+    await _api.post(
+          '/orders/$orderNo/rating',
+          data: {
+            'rating': rating,
+            if (content != null && content.trim().isNotEmpty)
+              'content': content.trim(),
+          },
+        )
+        as Map<String, dynamic>,
+  );
+
+  Future<RatingPage> myRatings({
+    int page = 1,
+    int size = 20,
+    CancelToken? cancelToken,
+  }) async => RatingPage.fromJson(
+    await _api.get(
+          '/passengers/me/ratings',
+          queryParameters: {'page': page, 'size': size},
+          cancelToken: cancelToken,
+        )
+        as Map<String, dynamic>,
+  );
 }
 
 class OrderCreated {
@@ -107,5 +144,79 @@ class OrderCreated {
     orderNo: json['orderNo'] as String,
     status: orderStatusFromJson(json['status']),
     quote: OrderQuote.fromJson(json['quote'] as Map<String, dynamic>),
+  );
+}
+
+
+/// A passenger's rating of the driver for one completed order.
+class OrderRating {
+  const OrderRating({
+    required this.rated,
+    this.rating,
+    this.content,
+    this.createdAt,
+  });
+
+  final bool rated;
+  final int? rating;
+  final String? content;
+  final DateTime? createdAt;
+
+  factory OrderRating.fromJson(Map<String, dynamic> json) => OrderRating(
+    rated: json['rated'] as bool? ?? false,
+    rating: (json['rating'] as num?)?.toInt(),
+    content: json['content'] as String?,
+    createdAt: json['createdAt'] == null
+        ? null
+        : DateTime.tryParse(json['createdAt'].toString()),
+  );
+}
+
+/// One submitted rating shown in the passenger's rating history.
+class RatingSummary {
+  const RatingSummary({
+    required this.orderNo,
+    this.rating,
+    this.content,
+    this.createdAt,
+  });
+
+  final String orderNo;
+  final int? rating;
+  final String? content;
+  final DateTime? createdAt;
+
+  factory RatingSummary.fromJson(Map<String, dynamic> json) => RatingSummary(
+    orderNo: json['orderNo'] as String,
+    rating: (json['rating'] as num?)?.toInt(),
+    content: json['content'] as String?,
+    createdAt: json['createdAt'] == null
+        ? null
+        : DateTime.tryParse(json['createdAt'].toString()),
+  );
+}
+
+/// Paginated rating history returned by `/passengers/me/ratings`.
+class RatingPage {
+  const RatingPage({
+    required this.page,
+    required this.size,
+    required this.total,
+    required this.records,
+  });
+
+  final int page;
+  final int size;
+  final int total;
+  final List<RatingSummary> records;
+
+  factory RatingPage.fromJson(Map<String, dynamic> json) => RatingPage(
+    page: (json['page'] as num).toInt(),
+    size: (json['size'] as num).toInt(),
+    total: (json['total'] as num).toInt(),
+    records: ((json['records'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(RatingSummary.fromJson)
+        .toList(growable: false)),
   );
 }

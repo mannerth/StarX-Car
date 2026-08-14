@@ -4,6 +4,8 @@ import 'package:starx_car_common/starx_car_common.dart';
 import 'package:image_picker/image_picker.dart';
 import '../auth/auth_controller.dart';
 import 'driver_repository.dart';
+import 'driver_ratings_page.dart';
+import '../work/driver_orders_history_page.dart';
 import '../work/driver_work_page.dart';
 
 const _plateProvinces = <String>[
@@ -217,6 +219,34 @@ class DriverProfileTab extends ConsumerWidget {
                 subtitle: Text(d['workStatus'] as String? ?? 'offline'),
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.star_outline),
+            title: const Text('我的评价'),
+            subtitle: const Text('查看乘客对我的行程评价'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const DriverRatingsPage(),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('历史订单'),
+            subtitle: const Text('查看已完成和已取消的订单'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const DriverOrdersHistoryPage(),
+              ),
+            ),
           ),
         ),
         FilledButton.tonal(

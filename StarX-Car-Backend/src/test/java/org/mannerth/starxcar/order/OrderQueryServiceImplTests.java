@@ -3,11 +3,14 @@ package org.mannerth.starxcar.order;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mannerth.starxcar.car.Car;
 import org.mannerth.starxcar.car.CarMapper;
 import org.mannerth.starxcar.constant.UserType;
+import org.mannerth.starxcar.driver.Driver;
 import org.mannerth.starxcar.driver.DriverMapper;
 import org.mannerth.starxcar.passenger.PassengerMapper;
 import org.mannerth.starxcar.order.response.OrderDetailResponse;
+import org.mannerth.starxcar.order.response.OrderDriverResponse;
 import org.mannerth.starxcar.order.response.OrderPageResponse;
 
 import java.math.BigDecimal;
@@ -23,6 +26,8 @@ class OrderQueryServiceImplTests {
     private RideOrderMapper rideOrderMapper;
     private RideOrderEventMapper eventMapper;
     private OrderAccessService accessService;
+    private DriverMapper driverMapper;
+    private CarMapper carMapper;
     private OrderQueryService service;
 
     @BeforeEach
@@ -30,8 +35,10 @@ class OrderQueryServiceImplTests {
         rideOrderMapper = mock(RideOrderMapper.class);
         eventMapper = mock(RideOrderEventMapper.class);
         accessService = mock(OrderAccessService.class);
-        service = new OrderQueryServiceImpl(rideOrderMapper, eventMapper, accessService, mock(DriverMapper.class),
-                mock(CarMapper.class), mock(PassengerMapper.class));
+        driverMapper = mock(DriverMapper.class);
+        carMapper = mock(CarMapper.class);
+        service = new OrderQueryServiceImpl(rideOrderMapper, eventMapper, accessService, driverMapper, carMapper,
+                mock(PassengerMapper.class));
     }
 
     @Test
@@ -70,6 +77,40 @@ class OrderQueryServiceImplTests {
             assertThat(item.eventType()).isEqualTo(OrderEventType.CREATE);
             assertThat(item.toStatus()).isEqualTo(OrderStatus.PENDING);
         });
+    }
+
+    @Test
+    void exposesFullPhoneRatingAndVehicleInfoForAssignedDriver() {
+        RideOrder order = order("O3", OrderStatus.ACCEPTED);
+        order.setDriverId(2L);
+        order.setCarId(9L);
+        given(accessService.requirePassengerOrder("O3", 1L)).willReturn(order);
+        given(eventMapper.selectList(any())).willReturn(List.of());
+        Driver driver = new Driver();
+        driver.setId(2L);
+        driver.setPhoneNumber("13800138000");
+        driver.setDisplayPhone("138****0000");
+        driver.setRating(new BigDecimal("4.8"));
+        given(driverMapper.selectById(2L)).willReturn(driver);
+        Car car = new Car();
+        car.setId(9L);
+        car.setCarNumber("京B12345");
+        car.setBrand("大众");
+        car.setColor("黑色");
+        car.setCarType("economy");
+        given(carMapper.selectById(9L)).willReturn(car);
+
+        OrderDetailResponse result = service.getOrder(1L, UserType.passenger, "O3");
+
+        OrderDriverResponse assigned = result.driver();
+        assertThat(assigned).isNotNull();
+        assertThat(assigned.phoneNumber()).isEqualTo("13800138000");
+        assertThat(assigned.displayPhone()).isEqualTo("138****0000");
+        assertThat(assigned.rating()).isEqualByComparingTo("4.8");
+        assertThat(assigned.carNumber()).isEqualTo("京B12345");
+        assertThat(assigned.carBrand()).isEqualTo("大众");
+        assertThat(assigned.carColor()).isEqualTo("黑色");
+        assertThat(assigned.carType()).isEqualTo("economy");
     }
 
     private RideOrder order(String orderNo, OrderStatus status) {

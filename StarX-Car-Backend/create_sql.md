@@ -107,7 +107,9 @@ CREATE TABLE driver
     id               INT PRIMARY KEY,
     phone_number     CHAR(11)     NOT NULL,
     license_number   VARCHAR(30)  NOT NULL,
-    rating           DECIMAL(2,1) NOT NULL DEFAULT 5.0,
+    rating           DECIMAL(2,1) NOT NULL DEFAULT 5.0 COMMENT '缓存平均评分；无评价时保持 5.0',
+    rating_sum       DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '累计评分总和，用于精确重算平均分',
+    rating_count     INT UNSIGNED  NOT NULL DEFAULT 0 COMMENT '累计评价次数',
     car_id           INT NULL COMMENT '当前实际使用的车辆 ID；司机可有多辆有效绑定车辆',
     display_phone    VARCHAR(11)  NOT NULL,  -- 普通列，触发器填充
     id_card_no       VARCHAR(18)  NULL,      -- 身份证号码
@@ -312,6 +314,53 @@ CREATE TABLE driver_location
     CONSTRAINT fk_driver_location_order FOREIGN KEY (active_order_id) REFERENCES ride_order (id),
     KEY idx_driver_location_active_order (active_order_id),
     KEY idx_driver_location_updated_time (updated_time)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+```
+
+评价：
+```sql
+CREATE TABLE order_rating
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id     BIGINT          NOT NULL COMMENT '被评价订单；一个订单仅一条乘客评价',
+    passenger_id INT             NOT NULL COMMENT '评价乘客 user.id，与 ride_order.passenger_id 一致',
+    driver_id    INT             NOT NULL COMMENT '被评价司机 user.id，与 ride_order.driver_id 一致',
+    rating       TINYINT UNSIGNED NOT NULL COMMENT '1-5 星整数评分，服务层校验范围',
+    content      VARCHAR(500)    NULL COMMENT '评价文字，可选',
+    created_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评价提交时间',
+    updated_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间（预留）',
+    CONSTRAINT fk_order_rating_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    CONSTRAINT fk_order_rating_passenger FOREIGN KEY (passenger_id) REFERENCES passenger (id),
+    CONSTRAINT fk_order_rating_driver FOREIGN KEY (driver_id) REFERENCES driver (id),
+    CONSTRAINT uk_order_rating_order UNIQUE (order_id),
+    KEY idx_order_rating_driver_created (driver_id, created_time),
+    KEY idx_order_rating_passenger_created (passenger_id, created_time)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+```
+
+存量库升级（2026-08-13 评价系统；新建库已包含上述结构，无需执行）：
+
+```sql
+ALTER TABLE driver
+    ADD COLUMN rating_sum   DECIMAL(12, 2) NOT NULL DEFAULT 0 COMMENT '累计评分总和，用于精确重算平均分' AFTER rating,
+    ADD COLUMN rating_count INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT '累计评价次数' AFTER rating_sum;
+
+CREATE TABLE order_rating
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id     BIGINT          NOT NULL COMMENT '被评价订单；一个订单仅一条乘客评价',
+    passenger_id INT             NOT NULL COMMENT '评价乘客 user.id，与 ride_order.passenger_id 一致',
+    driver_id    INT             NOT NULL COMMENT '被评价司机 user.id，与 ride_order.driver_id 一致',
+    rating       TINYINT UNSIGNED NOT NULL COMMENT '1-5 星整数评分，服务层校验范围',
+    content      VARCHAR(500)    NULL COMMENT '评价文字，可选',
+    created_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评价提交时间',
+    updated_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间（预留）',
+    CONSTRAINT fk_order_rating_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    CONSTRAINT fk_order_rating_passenger FOREIGN KEY (passenger_id) REFERENCES passenger (id),
+    CONSTRAINT fk_order_rating_driver FOREIGN KEY (driver_id) REFERENCES driver (id),
+    CONSTRAINT uk_order_rating_order UNIQUE (order_id),
+    KEY idx_order_rating_driver_created (driver_id, created_time),
+    KEY idx_order_rating_passenger_created (passenger_id, created_time)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 ```
 

@@ -1,6 +1,20 @@
 # Changelog
 
+## 2026-08-14
+
+### 订单详情司机与车辆信息（支持乘客联系司机）
+
+- `OrderDriverResponse` 新增 `phoneNumber`（司机完整手机号，仅供拨号联系）、`rating`（司机评分）、`carBrand`、`carColor`、`carType` 字段，与既有 `displayPhone`、`carNumber` 一起在订单详情 `GET /api/orders/{orderNo}` 返回；`OrderQueryServiceImpl` 组装逻辑同步扩展。
+- 归属访问控制不变：完整手机号只对订单归属的乘客/司机及管理员可见，用于乘客端「联系司机」拨打系统电话，界面仍展示脱敏手机号。
+- 测试：`OrderQueryServiceImplTests` 新增用例覆盖已接单司机的完整手机号、评分和车辆字段组装。
 ## 2026-08-13
+
+### 评价系统（乘客对司机 1-5 星评分）
+
+- 数据库：新增 `order_rating` 表（`order_id`、`passenger_id`、`driver_id`、`rating`、`content`、`created_time`、`updated_time`），外键关联 `ride_order`/`passenger`/`driver`，`uk_order_rating_order` 唯一约束保证一单一评，联合索引 `(driver_id, created_time)` 与 `(passenger_id, created_time)` 支撑司机/乘客评价列表；`driver` 表新增 `rating_sum`、`rating_count` 聚合列，`driver.rating` 改为缓存平均分。`create_sql.md` 已同步更新 `driver` 建表并新增 `order_rating` 建表，同时补充存量库升级 ALTER；已加载 `.env` 连接线上库执行升级并 `SHOW CREATE TABLE` 验证通过。
+- 新增评价接口：`POST /api/orders/{orderNo}/rating`（乘客对已完成且 7 天内的本人订单提交 1-5 星与可选文字，一单一评，同一事务原子更新司机聚合评分）、`GET /api/orders/{orderNo}/rating`（乘客/司机/管理员按归属查询，未评价返回 `rated=false`）、`GET /api/drivers/me/ratings`（司机分页查收到的评价）、`GET /api/passengers/me/ratings`（乘客分页查提交的评价）。全部接口带 OpenAPI 注解、角色控制和统一错误信封。
+- 司机评分更新采用单条原子 SQL：`rating_sum = rating_sum + score`、`rating_count = rating_count + 1`、`rating = ROUND(rating_sum / rating_count, 1)`，在真实 MySQL 上验证求值顺序正确（5/1=5.0、7/2=3.5）；`DriverMapper` 新增 `addRating` 与 `selectRatingAggregate`。
+- 测试：新增 `RatingServiceImplTests` 9 项（提交成功、订单未完成、超 7 天时限、重复评价、插入失败、查询已/未评价、司机评价分页）；`StarXCarBackendApplicationTests` 新增评价接口角色控制与 OpenAPI 路径用例；`OrderDatabaseSmokeIT` 扩展为完成订单后提交评价并断言 `order_rating` 落库、司机聚合分、列表查询与重复评价 409，全部临时数据随事务回滚。顺手修复烟测 suffix 使用 UUID 十六进制导致 `phoneTail` 偶发非 4 位数字的既有缺陷，改为 10 位纯数字。后端全量测试 104 项通过，真实库烟测 1 项通过。
 
 ### 乘客身份核对与接驾信息
 

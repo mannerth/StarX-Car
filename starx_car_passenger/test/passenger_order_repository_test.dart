@@ -161,6 +161,82 @@ void main() {
 
     expect(api.lastPath, 'DELETE /passengers/me');
   });
+
+  test('submitRating posts the star score and trimmed content', () async {
+    final api = RecordingApiClient({
+      'POST /orders/ORD-9/rating': {
+        'rated': true,
+        'rating': 5,
+        'content': '服务很好',
+        'createdAt': '2026-08-13 12:00:00',
+      },
+    });
+
+    final rating = await PassengerOrderRepository(
+      api,
+    ).submitRating('ORD-9', rating: 5, content: ' 服务很好 ');
+
+    expect(api.lastPath, 'POST /orders/ORD-9/rating');
+    expect(api.lastData, {'rating': 5, 'content': '服务很好'});
+    expect(rating.rated, isTrue);
+    expect(rating.rating, 5);
+    expect(rating.content, '服务很好');
+    expect(rating.createdAt, DateTime(2026, 8, 13, 12));
+  });
+
+  test('submitRating omits blank content and rating query parses unrated', () async {
+    final api = RecordingApiClient({
+      'POST /orders/ORD-9/rating': {
+        'rated': true,
+        'rating': 3,
+      },
+      'GET /orders/ORD-9/rating': {
+        'rated': false,
+        'rating': null,
+        'content': null,
+        'createdAt': null,
+      },
+    });
+    final repository = PassengerOrderRepository(api);
+
+    await repository.submitRating('ORD-9', rating: 3, content: '   ');
+    final current = await repository.rating('ORD-9');
+
+    expect(
+      (api.calls.first.data as Map<String, dynamic>).containsKey('content'),
+      isFalse,
+    );
+    expect(current.rated, isFalse);
+    expect(current.rating, isNull);
+    expect(current.content, isNull);
+  });
+
+  test('myRatings sends page/size and parses the history records', () async {
+    final api = RecordingApiClient({
+      'GET /passengers/me/ratings': {
+        'page': 1,
+        'size': 20,
+        'total': 1,
+        'records': [
+          {
+            'orderNo': 'ORD-9',
+            'rating': 5,
+            'content': '服务很好',
+            'createdAt': '2026-08-13 12:00:00',
+          },
+        ],
+      },
+    });
+
+    final page = await PassengerOrderRepository(
+      api,
+    ).myRatings(page: 1, size: 20);
+
+    expect(api.lastQuery, {'page': 1, 'size': 20});
+    expect(page.total, 1);
+    expect(page.records.single.orderNo, 'ORD-9');
+    expect(page.records.single.rating, 5);
+  });
 }
 
 Place _place(String name, double latitude, double longitude) => Place(

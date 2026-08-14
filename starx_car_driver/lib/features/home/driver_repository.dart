@@ -155,6 +155,19 @@ class DriverRepository {
       await _api.put('/cars/$carId', data: data);
     }
   }
+
+  Future<RatingPage> myRatings({
+    int page = 1,
+    int size = 20,
+    CancelToken? cancelToken,
+  }) async => RatingPage.fromJson(
+    await _api.get(
+          '/drivers/me/ratings',
+          queryParameters: {'page': page, 'size': size},
+          cancelToken: cancelToken,
+        )
+        as Map<String, dynamic>,
+  );
 }
 
 double _apiCoordinate(double value) => double.parse(value.toStringAsFixed(6));
@@ -166,3 +179,52 @@ String _formatBackendTime(DateTime value) {
       '${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
 }
 
+
+/// One rating the driver received, as shown in the driver's rating history.
+class RatingSummary {
+  const RatingSummary({
+    required this.orderNo,
+    this.rating,
+    this.content,
+    this.createdAt,
+  });
+
+  final String orderNo;
+  final int? rating;
+  final String? content;
+  final DateTime? createdAt;
+
+  factory RatingSummary.fromJson(Map<String, dynamic> json) => RatingSummary(
+    orderNo: json['orderNo'] as String,
+    rating: (json['rating'] as num?)?.toInt(),
+    content: json['content'] as String?,
+    createdAt: json['createdAt'] == null
+        ? null
+        : DateTime.tryParse(json['createdAt'].toString()),
+  );
+}
+
+/// Paginated rating history returned by `/drivers/me/ratings`.
+class RatingPage {
+  const RatingPage({
+    required this.page,
+    required this.size,
+    required this.total,
+    required this.records,
+  });
+
+  final int page;
+  final int size;
+  final int total;
+  final List<RatingSummary> records;
+
+  factory RatingPage.fromJson(Map<String, dynamic> json) => RatingPage(
+    page: (json['page'] as num).toInt(),
+    size: (json['size'] as num).toInt(),
+    total: (json['total'] as num).toInt(),
+    records: ((json['records'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(RatingSummary.fromJson)
+        .toList(growable: false)),
+  );
+}

@@ -85,18 +85,36 @@ class FareQuote {
 class OrderDriver {
   const OrderDriver({
     required this.driverId,
+    this.phoneNumber,
     this.displayPhone,
+    this.rating,
     this.carNumber,
+    this.carBrand,
+    this.carColor,
+    this.carType,
   });
 
   final int driverId;
+
+  /// The driver's full phone number. Use it only for dialing; display
+  /// [displayPhone] instead of this value.
+  final String? phoneNumber;
   final String? displayPhone;
+  final double? rating;
   final String? carNumber;
+  final String? carBrand;
+  final String? carColor;
+  final String? carType;
 
   factory OrderDriver.fromJson(Map<String, dynamic> json) => OrderDriver(
     driverId: (json['driverId'] as num).toInt(),
+    phoneNumber: json['phoneNumber'] as String?,
     displayPhone: json['displayPhone'] as String?,
+    rating: (json['rating'] as num?)?.toDouble(),
     carNumber: json['carNumber'] as String?,
+    carBrand: json['carBrand'] as String?,
+    carColor: json['carColor'] as String?,
+    carType: json['carType'] as String?,
   );
 }
 

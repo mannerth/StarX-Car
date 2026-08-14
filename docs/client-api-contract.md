@@ -198,8 +198,10 @@
 乘客只能读取自己的订单，司机只能读取自己已接订单；无权限时统一按 `404` 处理以
 避免泄露订单存在性。详情字段包括地点坐标、`estimatedDistanceM`、`estimatedDurationS`、
 `billingDistanceM`、`actualDurationS?`、`waitingDurationS?`、`fare`、`estimatedFare`、
-`passengerPhoneTail`（乘客手机尾号后四位，司机开始服务前用于身份核对）、司机脱敏资料、
-各状态时间、取消信息和事件列表。
+`passengerPhoneTail`（乘客手机尾号后四位，司机开始服务前用于身份核对）、司机与车辆资料
+（`driverId`、`phoneNumber` 完整手机号仅用于乘客拨号联系司机、`displayPhone` 脱敏手机号、
+`rating` 评分、`carNumber` 车牌号、`carBrand`/`carColor`/`carType` 车辆信息）、各状态时间、
+取消信息和事件列表。
 
 ### POST `/orders/{orderNo}/cancel`
 
@@ -221,6 +223,23 @@
 `recommendedRefreshSeconds`（默认 60）。客户端用高德 Android SDK 自行规划路线，后端
 不保存路线点或轨迹；状态不符为 `409`。
 
+### POST `/orders/{orderNo}/rating`
+
+仅订单乘客且订单为 `COMPLETED`。请求体 `{"rating":5,"content":"可选文字"}`，`rating`
+为 1-5 星整数、`content` 最多 500 字。订单完成后 7 天内可评价且只能评价一次；成功返回
+`{"rated":true,"rating":5,"content":"...","createdAt":"2026-08-13 12:00:00"}`。
+订单未完成、超过 7 天时限或已评价返回 `409`；订单不存在或无归属返回 `404`。
+
+### GET `/orders/{orderNo}/rating`
+
+乘客只能查自己的订单，司机只能查自己接的订单，管理员可查任意订单；无权限按 `404`
+处理。已评价返回 `{"rated":true,"rating":5,"content":"...","createdAt":"..."}`，
+未评价返回 `{"rated":false,"rating":null,"content":null,"createdAt":null}`。
+
+### GET `/passengers/me/ratings?page=&size=`
+
+仅 `passenger`，按提交时间倒序分页返回本人提交的评价，列表项含 `orderNo`、`rating`、
+`content`、`createdAt`。
 ## 4. 司机资料、车辆和位置
 
 ### GET `/drivers/me`
@@ -302,6 +321,11 @@
 等待秒数结算，返回 `OrderCompletionResponse`：`orderNo`、`status=COMPLETED`、
 `completedTime`、`actualDurationS`、`waitingDurationS` 和最终 `fare`。客户端不得重算金额。
 
+### GET `/drivers/me/ratings?page=&size=`
+
+仅 `driver`，按提交时间倒序分页返回本人收到的评价，列表项含 `orderNo`、`rating`、
+`content`、`createdAt`。司机也可通过 `GET /orders/{orderNo}/rating` 查看自己接过的
+某笔订单是否被评价。
 ## 6. 状态机与客户端行为
 
 ```text

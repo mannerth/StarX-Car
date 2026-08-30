@@ -23,6 +23,13 @@ driver-location:
   freshness-seconds: 30
   max-recorded-time-future-seconds: 60
 
+reservation:
+  dispatch-ahead-minutes: 30
+  dispatch-interval-ms: 30000
+  min-lead-minutes: 30
+  max-advance-days: 7
+  expire-grace-minutes: 30
+
 file:
   upload-path: ./target/uploads
 

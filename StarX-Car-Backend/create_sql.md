@@ -210,6 +210,7 @@ CREATE TABLE ride_order
 (
     id                   BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_no             VARCHAR(32)    NOT NULL COMMENT '对外订单号',
+    order_type           VARCHAR(20)    NOT NULL DEFAULT 'INSTANT' COMMENT '订单类型：INSTANT 即时单、SCHEDULED 预约单',
     passenger_id         INT            NOT NULL,
     driver_id            INT            NULL COMMENT '抢单成功后写入',
     car_id               INT            NULL COMMENT '抢单成功时写入 driver.car_id 快照',
@@ -229,6 +230,7 @@ CREATE TABLE ride_order
     destination_address  VARCHAR(255)   NULL,
     destination_lat      DECIMAL(10, 6) NOT NULL COMMENT 'GCJ-02 纬度',
     destination_lng      DECIMAL(10, 6) NOT NULL COMMENT 'GCJ-02 经度',
+    scheduled_pickup_time DATETIME      NULL COMMENT '预约上车时间；即时单为 NULL',
 
     estimated_distance_m INT UNSIGNED   NOT NULL COMMENT '高德规划距离',
     estimated_duration_s INT UNSIGNED   NOT NULL COMMENT '高德规划时长',
@@ -242,12 +244,13 @@ CREATE TABLE ride_order
     total_fare           DECIMAL(10, 2) NOT NULL DEFAULT 0,
 
     created_time         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    dispatch_time        DATETIME       NULL COMMENT '订单进入可抢单 PENDING 的时间；即时单等于创建时间',
     accepted_time        DATETIME       NULL,
     driver_arrived_time  DATETIME       NULL,
     service_started_time DATETIME       NULL,
     completed_time       DATETIME       NULL,
     cancelled_time       DATETIME       NULL,
-    cancelled_by         VARCHAR(20)    NULL COMMENT 'passenger、driver',
+    cancelled_by         VARCHAR(20)    NULL COMMENT 'passenger、driver、system（预约单过期清理）',
     cancel_reason        VARCHAR(255)   NULL,
     updated_time         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -258,14 +261,15 @@ CREATE TABLE ride_order
     CONSTRAINT uk_ride_order_no UNIQUE (order_no),
     KEY idx_ride_order_passenger_created (passenger_id, created_time),
     KEY idx_ride_order_driver_status_created (driver_id, status, created_time),
-    KEY idx_ride_order_status_created (status, created_time)
+    KEY idx_ride_order_status_created (status, created_time),
+    KEY idx_ride_order_type_status_scheduled (order_type, status, scheduled_pickup_time)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE ride_order_event
 (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_id      BIGINT       NOT NULL,
-    event_type    VARCHAR(30)  NOT NULL COMMENT 'CREATE、ACCEPT、ARRIVE、START_SERVICE、COMPLETE、CANCEL',
+    event_type    VARCHAR(30)  NOT NULL COMMENT 'CREATE、DISPATCH（预约单 SCHEDULED->PENDING）、ACCEPT、ARRIVE、START_SERVICE、COMPLETE、CANCEL',
     from_status   VARCHAR(30)  NULL,
     to_status     VARCHAR(30)  NOT NULL,
     operator_type VARCHAR(20)  NOT NULL COMMENT 'passenger、driver、system、admin',
@@ -362,6 +366,21 @@ CREATE TABLE order_rating
     KEY idx_order_rating_driver_created (driver_id, created_time),
     KEY idx_order_rating_passenger_created (passenger_id, created_time)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+```
+
+存量库升级（2026-08-30 预约单；新建库已包含上述结构，无需执行）：
+
+```sql
+ALTER TABLE ride_order
+    ADD COLUMN order_type           VARCHAR(20) NOT NULL DEFAULT 'INSTANT'
+        COMMENT '订单类型：INSTANT 即时单、SCHEDULED 预约单' AFTER order_no,
+    ADD COLUMN scheduled_pickup_time DATETIME NULL
+        COMMENT '预约上车时间；即时单为 NULL' AFTER destination_lng,
+    ADD COLUMN dispatch_time        DATETIME NULL
+        COMMENT '订单进入可抢单 PENDING 的时间；即时单等于创建时间' AFTER created_time;
+
+CREATE INDEX idx_ride_order_type_status_scheduled
+    ON ride_order (order_type, status, scheduled_pickup_time);
 ```
 
 默认即时叫车计价规则：

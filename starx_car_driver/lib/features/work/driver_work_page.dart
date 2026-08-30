@@ -145,53 +145,88 @@ class _PendingOrderTileState extends ConsumerState<_PendingOrderTile> {
   bool _loading = false;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    title: Text(
-      '${widget.order.pickupName} -> ${widget.order.destinationName}',
-    ),
-    subtitle: Text('预估 ¥${widget.order.totalFare}'),
-    trailing: FilledButton(
-      onPressed: _loading
-          ? null
-          : () async {
-              final confirmed = await _confirmWorkAction(context, '抢单');
-              if (!confirmed || !context.mounted) return;
-              final navigator = Navigator.of(context);
-              final messenger = ScaffoldMessenger.of(context);
-              setState(() => _loading = true);
-              try {
-                await ref
-                    .read(driverRepositoryProvider)
-                    .acceptOrder(widget.order.orderNo);
-                ref.invalidate(pendingOrdersProvider);
-                ref.invalidate(driverOrdersProvider);
-                if (mounted && navigator.mounted) {
-                  await navigator.push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          DriverOrderDetailPage(orderNo: widget.order.orderNo),
-                    ),
-                  );
+  Widget build(BuildContext context) {
+    final order = widget.order;
+    final scheduled =
+        order.isScheduled && order.scheduledPickupTime != null;
+    return ListTile(
+      title: Row(
+        children: [
+          if (scheduled) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Text(
+                '预约',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: Colors.blue.shade700),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Text(
+              '${order.pickupName} -> ${order.destinationName}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      subtitle: Text(
+        scheduled
+            ? '预约 ${_formatTime(order.scheduledPickupTime!)} 上车 · 预估 ¥${order.totalFare}'
+            : '预估 ¥${order.totalFare}',
+      ),
+      trailing: FilledButton(
+        onPressed: _loading
+            ? null
+            : () async {
+                final confirmed = await _confirmWorkAction(context, '抢单');
+                if (!confirmed || !context.mounted) return;
+                final navigator = Navigator.of(context);
+                final messenger = ScaffoldMessenger.of(context);
+                setState(() => _loading = true);
+                try {
+                  await ref
+                      .read(driverRepositoryProvider)
+                      .acceptOrder(widget.order.orderNo);
+                  ref.invalidate(pendingOrdersProvider);
+                  ref.invalidate(driverOrdersProvider);
+                  if (mounted && navigator.mounted) {
+                    await navigator.push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => DriverOrderDetailPage(
+                          orderNo: widget.order.orderNo,
+                        ),
+                      ),
+                    );
+                  }
+                } on ApiException catch (error) {
+                  if (mounted && messenger.mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text(error.message)),
+                    );
+                  }
+                } finally {
+                  if (mounted) setState(() => _loading = false);
                 }
-              } on ApiException catch (error) {
-                if (mounted && messenger.mounted) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text(error.message)),
-                  );
-                }
-              } finally {
-                if (mounted) setState(() => _loading = false);
-              }
-            },
-      child: _loading
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Text('抢单'),
-    ),
-  );
+              },
+        child: _loading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text('抢单'),
+      ),
+    );
+  }
 }
 
 String _statusLabel(OrderStatus status) => switch (status) {
@@ -200,6 +235,11 @@ String _statusLabel(OrderStatus status) => switch (status) {
   OrderStatus.inService => '服务中',
   _ => '进行中',
 };
+
+String _formatTime(DateTime time) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(time.month)}-${two(time.day)} ${two(time.hour)}:${two(time.minute)}';
+}
 
 Future<bool> _confirmWorkAction(BuildContext context, String action) async =>
     await showDialog<bool>(

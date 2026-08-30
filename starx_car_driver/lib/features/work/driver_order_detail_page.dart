@@ -185,6 +185,11 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: 12),
+        if (order.isScheduled && order.scheduledPickupTime != null)
+          _InfoRow(
+            label: '预约上车时间',
+            value: _formatTime(order.scheduledPickupTime!),
+          ),
         _DriverOrderMap(order: order),
         const SizedBox(height: 12),
         _PlaceRow(label: '上车点', place: order.pickup, icon: Icons.trip_origin),
@@ -586,6 +591,7 @@ class _ErrorBody extends StatelessWidget {
 }
 
 String _statusLabel(OrderStatus status) => switch (status) {
+  OrderStatus.scheduled => '等待派单',
   OrderStatus.pending => '等待乘客订单',
   OrderStatus.accepted => '前往上车点',
   OrderStatus.driverArrived => '等待乘客上车',
@@ -611,5 +617,10 @@ double _distanceM(GeoPoint first, GeoPoint second) {
 }
 
 int _minutes(int seconds) => (seconds / 60).ceil();
+
+String _formatTime(DateTime time) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(time.month)}-${two(time.day)} ${two(time.hour)}:${two(time.minute)}';
+}
 
 

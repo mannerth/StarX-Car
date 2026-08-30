@@ -70,7 +70,8 @@ public class DriverDispatchServiceImpl implements DriverDispatchService {
                 .orderByDesc(RideOrder::getCreatedTime)
                 .orderByDesc(RideOrder::getId));
         List<OrderSummaryResponse> records = result.getRecords().stream().map(order -> new OrderSummaryResponse(
-                order.getOrderNo(), order.getStatus(), order.getPickupName(), order.getDestinationName(),
+                order.getOrderNo(), order.getStatus(), order.getOrderType(), order.getScheduledPickupTime(),
+                order.getPickupName(), order.getDestinationName(),
                 order.getTotalFare(), order.getCreatedTime(), true)).toList();
         return new OrderPageResponse(result.getCurrent(), result.getSize(), result.getTotal(), records);
     }

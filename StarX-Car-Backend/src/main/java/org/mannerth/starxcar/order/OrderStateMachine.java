@@ -24,6 +24,8 @@ public final class OrderStateMachine {
 
     private static Map<OrderStatus, Map<OrderEventType, OrderStatus>> transitions() {
         Map<OrderStatus, Map<OrderEventType, OrderStatus>> transitions = new EnumMap<>(OrderStatus.class);
+        transitions.put(OrderStatus.SCHEDULED, transitions(OrderEventType.DISPATCH, OrderStatus.PENDING,
+                OrderEventType.CANCEL, OrderStatus.CANCELLED));
         transitions.put(OrderStatus.PENDING, transitions(OrderEventType.ACCEPT, OrderStatus.ACCEPTED,
                 OrderEventType.CANCEL, OrderStatus.CANCELLED));
         transitions.put(OrderStatus.ACCEPTED, transitions(OrderEventType.ARRIVE, OrderStatus.DRIVER_ARRIVED,

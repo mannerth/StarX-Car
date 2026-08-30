@@ -16,6 +16,15 @@ class OrderStateMachineTests {
     }
 
     @Test
+    void allowsOnlyConfirmedReservationTransitions() {
+        assertThat(OrderStateMachine.allows(OrderStatus.SCHEDULED, OrderEventType.DISPATCH, OrderStatus.PENDING)).isTrue();
+        assertThat(OrderStateMachine.allows(OrderStatus.SCHEDULED, OrderEventType.CANCEL, OrderStatus.CANCELLED)).isTrue();
+        assertThat(OrderStateMachine.targetStatus(OrderStatus.SCHEDULED, OrderEventType.ACCEPT)).isEmpty();
+        assertThat(OrderStateMachine.allows(OrderStatus.SCHEDULED, OrderEventType.COMPLETE, OrderStatus.COMPLETED)).isFalse();
+        assertThat(OrderStateMachine.allows(OrderStatus.PENDING, OrderEventType.DISPATCH, OrderStatus.PENDING)).isFalse();
+    }
+
+    @Test
     void rejectsTransitionsOutsideConfirmedStateMachine() {
         assertThat(OrderStateMachine.targetStatus(OrderStatus.COMPLETED, OrderEventType.CANCEL)).isEmpty();
         assertThat(OrderStateMachine.allows(OrderStatus.DRIVER_ARRIVED, OrderEventType.CANCEL, OrderStatus.CANCELLED)).isFalse();

@@ -14,6 +14,7 @@ public class RideOrder {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String orderNo;
+    private OrderType orderType;
     private Long passengerId;
     private Long driverId;
     private Long carId;
@@ -32,6 +33,7 @@ public class RideOrder {
     private String destinationAddress;
     private BigDecimal destinationLat;
     private BigDecimal destinationLng;
+    private LocalDateTime scheduledPickupTime;
     private Long estimatedDistanceM;
     private Long estimatedDurationS;
     private Long billingDistanceM;
@@ -43,6 +45,7 @@ public class RideOrder {
     private BigDecimal waitingFare;
     private BigDecimal totalFare;
     private LocalDateTime createdTime;
+    private LocalDateTime dispatchTime;
     private LocalDateTime acceptedTime;
     private LocalDateTime driverArrivedTime;
     private LocalDateTime serviceStartedTime;

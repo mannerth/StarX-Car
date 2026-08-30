@@ -26,6 +26,7 @@ import org.mannerth.starxcar.order.request.OrderQuoteRequest;
 import org.mannerth.starxcar.order.request.PlaceRequest;
 import org.mannerth.starxcar.order.response.OrderCreatedResponse;
 import org.mannerth.starxcar.order.response.OrderDetailResponse;
+import org.mannerth.starxcar.order.response.OrderPageResponse;
 import org.mannerth.starxcar.order.response.OrderQuoteResponse;
 import org.mannerth.starxcar.order.response.RideRouteContextResponse;
 import org.mannerth.starxcar.order.rating.OrderRating;
@@ -106,6 +107,8 @@ class OrderDatabaseSmokeIT {
     private RatingService ratingService;
     @Autowired
     private OrderRatingMapper ratingMapper;
+    @Autowired
+    private ReservationDispatchService reservationDispatchService;
 
     @MockitoBean
     private AmapRouteClient amapRouteClient;
@@ -217,6 +220,97 @@ class OrderDatabaseSmokeIT {
         assertThat(adminPricingRuleService.get(archived.id()).tiers()).hasSize(7);
     }
 
+    @Test
+    void persistsAndRollsBackReservationWorkflow() {
+        String suffix = String.valueOf(java.util.concurrent.ThreadLocalRandom.current().nextLong(1_000_000_000L, 10_000_000_000L));
+        User passengerUser = user("it-res-pass-" + suffix, UserType.passenger);
+        User driverUser = user("it-res-driver-" + suffix, UserType.driver);
+        User adminUser = user("it-res-admin-" + suffix, UserType.admin);
+        insert(passengerUser);
+        insert(driverUser);
+        insert(adminUser);
+        passengerId = passengerUser.getId();
+        driverId = driverUser.getId();
+        adminId = adminUser.getId();
+        insertPassenger(passengerUser.getId(), "137" + suffix.substring(0, 8));
+        Car car = insertCar("RES" + suffix.substring(0, 6));
+        carId = car.getId();
+        insertDriver(driverUser.getId(), car.getId(), "136" + suffix.substring(0, 8));
+        insertBinding(driverUser.getId(), car.getId());
+        reportLocation(driverUser.getId());
+
+        given(amapRouteClient.estimateDrivingRoute(any(), any())).willReturn(new RouteEstimate(12_001, 1_801));
+
+        LocalDateTime pickup = LocalDateTime.now(BUSINESS_ZONE).plusHours(2).withNano(0);
+        OrderQuoteRequest reservationA = reservationRequest(pickup);
+        OrderCreatedResponse createdA = orderService.create(passengerUser.getId(), reservationA);
+        orderNo = createdA.orderNo();
+        assertThat(createdA.status()).isEqualTo(OrderStatus.SCHEDULED);
+        RideOrder scheduledA = order(createdA.orderNo());
+        assertThat(scheduledA.getOrderType()).isEqualTo(OrderType.SCHEDULED);
+        assertThat(scheduledA.getScheduledPickupTime()).isEqualTo(pickup);
+        assertThat(scheduledA.getDispatchTime()).isNull();
+        assertThat(eventMapper.selectCount(Wrappers.<RideOrderEvent>lambdaQuery()
+                .eq(RideOrderEvent::getOrderId, scheduledA.getId())
+                .eq(RideOrderEvent::getEventType, OrderEventType.CREATE)
+                .eq(RideOrderEvent::getToStatus, OrderStatus.SCHEDULED))).isEqualTo(1);
+
+        assertThatThrownBy(() -> orderService.create(passengerUser.getId(), reservationRequest(pickup.plusHours(1))))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+
+        OrderCreatedResponse instant = orderService.create(passengerUser.getId(), quoteRequest());
+        assertThat(instant.status()).isEqualTo(OrderStatus.PENDING);
+        lifecycleService.cancelByPassenger(passengerUser.getId(), instant.orderNo(), null);
+        assertThat(order(instant.orderNo()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
+
+        lifecycleService.cancelByPassenger(passengerUser.getId(), createdA.orderNo(), "计划变更");
+        assertThat(order(createdA.orderNo()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
+
+        LocalDateTime duePickup = LocalDateTime.now(BUSINESS_ZONE).plusHours(3).withNano(0);
+        OrderCreatedResponse createdB = orderService.create(passengerUser.getId(), reservationRequest(duePickup));
+        RideOrder scheduledB = order(createdB.orderNo());
+        scheduledB.setScheduledPickupTime(LocalDateTime.now(BUSINESS_ZONE).minusMinutes(1).withNano(0));
+        assertThat(orderMapper.updateById(scheduledB)).isEqualTo(1);
+        assertThat(reservationDispatchService.dispatchDueReservations()).isEqualTo(1);
+        RideOrder pendingB = order(createdB.orderNo());
+        assertThat(pendingB.getStatus()).isEqualTo(OrderStatus.PENDING);
+        assertThat(pendingB.getDispatchTime()).isNotNull();
+        assertThat(eventMapper.selectCount(Wrappers.<RideOrderEvent>lambdaQuery()
+                .eq(RideOrderEvent::getOrderId, pendingB.getId())
+                .eq(RideOrderEvent::getEventType, OrderEventType.DISPATCH))).isEqualTo(1);
+
+        reportLocation(driverUser.getId());
+        OrderPageResponse pending = dispatchService.listPendingOrders(driverUser.getId(), 1, 20);
+        assertThat(pending.records()).anyMatch(summary -> summary.orderType() == OrderType.SCHEDULED
+                && summary.orderNo().equals(createdB.orderNo()) && summary.scheduledPickupTime() != null);
+        dispatchService.acceptOrder(driverUser.getId(), createdB.orderNo());
+        orderId = order(createdB.orderNo()).getId();
+        assertThat(order(createdB.orderNo()).getStatus()).isEqualTo(OrderStatus.ACCEPTED);
+
+        lifecycleService.cancelByDriver(driverUser.getId(), createdB.orderNo(), "不去了");
+        assertThat(order(createdB.orderNo()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
+
+        OrderCreatedResponse createdC = orderService.create(passengerUser.getId(), reservationRequest(duePickup.plusHours(2)));
+        RideOrder scheduledC = order(createdC.orderNo());
+        scheduledC.setScheduledPickupTime(LocalDateTime.now(BUSINESS_ZONE).minusMinutes(1).withNano(0));
+        assertThat(orderMapper.updateById(scheduledC)).isEqualTo(1);
+        assertThat(reservationDispatchService.dispatchDueReservations()).isEqualTo(1);
+        RideOrder pendingC = order(createdC.orderNo());
+        assertThat(pendingC.getStatus()).isEqualTo(OrderStatus.PENDING);
+        pendingC.setScheduledPickupTime(LocalDateTime.now(BUSINESS_ZONE).minusMinutes(40).withNano(0));
+        assertThat(orderMapper.updateById(pendingC)).isEqualTo(1);
+        assertThat(reservationDispatchService.expireStaleReservations()).isEqualTo(1);
+        RideOrder expiredC = order(createdC.orderNo());
+        assertThat(expiredC.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(expiredC.getCancelledBy()).isEqualTo("system");
+        assertThat(expiredC.getCancelReason()).contains("30分钟");
+        assertThat(eventMapper.selectCount(Wrappers.<RideOrderEvent>lambdaQuery()
+                .eq(RideOrderEvent::getOrderId, expiredC.getId())
+                .eq(RideOrderEvent::getEventType, OrderEventType.CANCEL)
+                .eq(RideOrderEvent::getOperatorType, OrderOperatorType.system))).isEqualTo(1);
+    }
+
     @AfterTransaction
     void rollsBackAllTemporaryBusinessRows() {
         assertThat(userMapper.selectById(passengerId)).isNull();
@@ -304,6 +398,19 @@ class OrderDatabaseSmokeIT {
         return new OrderQuoteRequest(
                 new PlaceRequest("pickup", "上车点", "测试地址", new BigDecimal("39.916527"), new BigDecimal("116.397128")),
                 new PlaceRequest("destination", "目的地", "测试地址", new BigDecimal("39.926527"), new BigDecimal("116.407128")));
+    }
+
+    private OrderQuoteRequest reservationRequest(LocalDateTime scheduledPickupTime) {
+        return new OrderQuoteRequest(
+                new PlaceRequest("pickup", "上车点", "测试地址", new BigDecimal("39.916527"), new BigDecimal("116.397128")),
+                new PlaceRequest("destination", "目的地", "测试地址", new BigDecimal("39.926527"), new BigDecimal("116.407128")),
+                OrderType.SCHEDULED, scheduledPickupTime);
+    }
+
+    private void reportLocation(Long driverId) {
+        driverWorkService.reportLocation(driverId, new DriverLocationRequest(
+                new BigDecimal("39.916527"), new BigDecimal("116.397128"), new BigDecimal("8.50"),
+                new BigDecimal("12.30"), new BigDecimal("180.00"), LocalDateTime.now(BUSINESS_ZONE)));
     }
 
     private PricingRuleWriteRequest pricingRuleRequest(String name) {

@@ -51,6 +51,67 @@ void main() {
     expect(api.calls.single.cancelToken, same(cancelToken));
   });
 
+  test('reservation quote sends orderType and formatted scheduled time', () async {
+    final api = RecordingApiClient({
+      'POST /orders/quote': {
+        'pricingRuleId': 3,
+        'pricingRuleVersion': 2,
+        'estimatedDistanceM': 4200,
+        'estimatedDurationS': 900,
+        'fare': _fare(),
+        'orderType': 'SCHEDULED',
+        'scheduledPickupTime': '2026-08-06 10:30:00',
+      },
+    });
+    final repository = PassengerOrderRepository(api);
+
+    final quote = await repository.quote(
+      pickup: _place('上车点', 31.2, 121.4),
+      destination: _place('目的地', 31.21, 121.42),
+      orderType: OrderType.scheduled,
+      scheduledPickupTime: DateTime(2026, 8, 6, 10, 30),
+    );
+
+    final body = api.lastData as Map<String, dynamic>;
+    expect(body['orderType'], 'SCHEDULED');
+    expect(body['scheduledPickupTime'], '2026-08-06 10:30:00');
+    expect(quote.orderType, OrderType.scheduled);
+    expect(quote.scheduledPickupTime, DateTime(2026, 8, 6, 10, 30));
+  });
+
+  test('instant create omits reservation fields and scheduled create sends them',
+      () async {
+    final api = RecordingApiClient({
+      'POST /orders': {
+        'orderNo': 'ORD-RES',
+        'status': 'SCHEDULED',
+        'quote': {
+          'pricingRuleId': 3,
+          'pricingRuleVersion': 2,
+          'estimatedDistanceM': 4200,
+          'estimatedDurationS': 900,
+          'fare': _fare(),
+          'orderType': 'SCHEDULED',
+          'scheduledPickupTime': '2026-08-06 10:30:00',
+        },
+      },
+    });
+    final repository = PassengerOrderRepository(api);
+
+    final created = await repository.create(
+      pickup: _place('上车点', 31.2, 121.4),
+      destination: _place('目的地', 31.21, 121.42),
+      orderType: OrderType.scheduled,
+      scheduledPickupTime: DateTime(2026, 8, 6, 10, 30),
+    );
+
+    expect(created.status, OrderStatus.scheduled);
+    expect(created.quote.orderType, OrderType.scheduled);
+    final body = api.lastData as Map<String, dynamic>;
+    expect(body['orderType'], 'SCHEDULED');
+    expect(body['scheduledPickupTime'], '2026-08-06 10:30:00');
+  });
+
   test('list sends status filter and parses server records', () async {
     final api = RecordingApiClient({
       'GET /passengers/me/orders': {

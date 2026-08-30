@@ -3,6 +3,7 @@ package org.mannerth.starxcar.order;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.mannerth.starxcar.auth.User;
 import org.mannerth.starxcar.auth.UserMapper;
+import org.mannerth.starxcar.config.ReservationProperties;
 import org.mannerth.starxcar.infra.amap.AmapRouteClient;
 import org.mannerth.starxcar.infra.amap.Gcj02Coordinate;
 import org.mannerth.starxcar.infra.amap.RouteEstimate;
@@ -32,6 +33,7 @@ import java.util.List;
 public class OrderServiceImpl implements OrderService {
     private static final List<OrderStatus> UNFINISHED_STATUSES = List.of(
             OrderStatus.PENDING, OrderStatus.ACCEPTED, OrderStatus.DRIVER_ARRIVED, OrderStatus.IN_SERVICE);
+    private static final List<OrderStatus> ACTIVE_RESERVATION_STATUSES = List.of(OrderStatus.SCHEDULED, OrderStatus.PENDING);
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
 
     private final PassengerMapper passengerMapper;
@@ -42,12 +44,14 @@ public class OrderServiceImpl implements OrderService {
     private final FareCalculator fareCalculator;
     private final AmapRouteClient amapRouteClient;
     private final OrderNumberGenerator orderNumberGenerator;
+    private final ReservationProperties reservationProperties;
     private final Clock clock;
 
     public OrderServiceImpl(PassengerMapper passengerMapper, UserMapper userMapper, RideOrderMapper rideOrderMapper,
                             RideOrderEventMapper rideOrderEventMapper, PricingRuleService pricingRuleService,
                             FareCalculator fareCalculator, AmapRouteClient amapRouteClient,
-                            OrderNumberGenerator orderNumberGenerator, Clock clock) {
+                            OrderNumberGenerator orderNumberGenerator, ReservationProperties reservationProperties,
+                            Clock clock) {
         this.passengerMapper = passengerMapper;
         this.userMapper = userMapper;
         this.rideOrderMapper = rideOrderMapper;
@@ -56,11 +60,13 @@ public class OrderServiceImpl implements OrderService {
         this.fareCalculator = fareCalculator;
         this.amapRouteClient = amapRouteClient;
         this.orderNumberGenerator = orderNumberGenerator;
+        this.reservationProperties = reservationProperties;
         this.clock = clock;
     }
 
     @Override
     public OrderQuoteResponse quote(OrderQuoteRequest request) {
+        validateOrderType(request);
         return calculateQuote(request);
     }
 
@@ -72,11 +78,22 @@ public class OrderServiceImpl implements OrderService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "乘客不存在");
         }
         requireActivePassenger(passengerId);
-        long unfinishedCount = rideOrderMapper.selectCount(Wrappers.<RideOrder>lambdaQuery()
-                .eq(RideOrder::getPassengerId, passengerId)
-                .in(RideOrder::getStatus, UNFINISHED_STATUSES));
-        if (unfinishedCount > 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "当前存在未结束订单");
+        validateOrderType(request);
+        if (request.orderType() == OrderType.SCHEDULED) {
+            long reservationCount = rideOrderMapper.selectCount(Wrappers.<RideOrder>lambdaQuery()
+                    .eq(RideOrder::getPassengerId, passengerId)
+                    .eq(RideOrder::getOrderType, OrderType.SCHEDULED)
+                    .in(RideOrder::getStatus, ACTIVE_RESERVATION_STATUSES));
+            if (reservationCount > 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "当前存在未结束的预约订单");
+            }
+        } else {
+            long unfinishedCount = rideOrderMapper.selectCount(Wrappers.<RideOrder>lambdaQuery()
+                    .eq(RideOrder::getPassengerId, passengerId)
+                    .in(RideOrder::getStatus, UNFINISHED_STATUSES));
+            if (unfinishedCount > 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "当前存在未结束订单");
+            }
         }
 
         OrderQuoteResponse quote = calculateQuote(request);
@@ -87,7 +104,7 @@ public class OrderServiceImpl implements OrderService {
         RideOrderEvent event = new RideOrderEvent();
         event.setOrderId(order.getId());
         event.setEventType(OrderEventType.CREATE);
-        event.setToStatus(OrderStatus.PENDING);
+        event.setToStatus(order.getStatus());
         event.setOperatorType(OrderOperatorType.passenger);
         event.setOperatorId(passengerId);
         event.setCreatedTime(now());
@@ -95,25 +112,58 @@ public class OrderServiceImpl implements OrderService {
         return new OrderCreatedResponse(order.getOrderNo(), order.getStatus(), quote);
     }
 
+    private void validateOrderType(OrderQuoteRequest request) {
+        if (request.orderType() == OrderType.INSTANT) {
+            if (request.scheduledPickupTime() != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "即时单不能指定预约上车时间");
+            }
+        } else {
+            validateReservationTime(request.scheduledPickupTime());
+        }
+    }
+
+    private void validateReservationTime(LocalDateTime scheduledPickupTime) {
+        if (scheduledPickupTime == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "预约单必须指定预约上车时间");
+        }
+        LocalDateTime now = now();
+        LocalDateTime earliest = now.plusMinutes(reservationProperties.getMinLeadMinutes());
+        LocalDateTime latest = now.plusDays(reservationProperties.getMaxAdvanceDays());
+        if (scheduledPickupTime.isBefore(earliest)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "预约时间必须晚于当前时间至少 " + reservationProperties.getMinLeadMinutes() + " 分钟");
+        }
+        if (scheduledPickupTime.isAfter(latest)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "预约时间不能超过当前时间 " + reservationProperties.getMaxAdvanceDays() + " 天");
+        }
+    }
+
     private OrderQuoteResponse calculateQuote(OrderQuoteRequest request) {
         PricingRuleDefinition rule = pricingRuleService.getDefaultActiveRule();
         RouteEstimate route = amapRouteClient.estimateDrivingRoute(toCoordinate(request.pickup()),
                 toCoordinate(request.destination()));
         FareCalculation fare = fareCalculator.calculate(rule, route.distanceM(), route.durationS(), 0);
-        return new OrderQuoteResponse(rule.id(), rule.version(), route.distanceM(), route.durationS(), toFare(fare));
+        return new OrderQuoteResponse(rule.id(), rule.version(), route.distanceM(), route.durationS(), toFare(fare),
+                request.orderType(), request.scheduledPickupTime());
     }
 
     private RideOrder buildOrder(Long passengerId, OrderQuoteRequest request, OrderQuoteResponse quote) {
         RideOrder order = new RideOrder();
         order.setOrderNo(orderNumberGenerator.next());
+        order.setOrderType(request.orderType());
         order.setPassengerId(passengerId);
         order.setPricingRuleId(quote.pricingRuleId());
         order.setPricingRuleVersion(quote.pricingRuleVersion());
-        order.setStatus(OrderStatus.PENDING);
+        boolean scheduled = request.orderType() == OrderType.SCHEDULED;
+        order.setStatus(scheduled ? OrderStatus.SCHEDULED : OrderStatus.PENDING);
         order.setVersion(0L);
         order.setPaymentStatus("unpaid");
         copyPickup(order, request.pickup());
         copyDestination(order, request.destination());
+        if (scheduled) {
+            order.setScheduledPickupTime(request.scheduledPickupTime());
+        }
         order.setEstimatedDistanceM(quote.estimatedDistanceM());
         order.setEstimatedDurationS(quote.estimatedDurationS());
         order.setBillingDistanceM(quote.estimatedDistanceM());
@@ -123,6 +173,7 @@ public class OrderServiceImpl implements OrderService {
         order.setWaitingFare(quote.fare().waitingFare());
         order.setTotalFare(quote.fare().totalFare());
         order.setCreatedTime(now());
+        order.setDispatchTime(scheduled ? null : order.getCreatedTime());
         return order;
     }
 

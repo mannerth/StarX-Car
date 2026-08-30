@@ -330,7 +330,7 @@ Repository、Controller/Notifier、页面和定时任务均按角色放置；com
 
 ## 8. 明确暂不纳入
 
-- 在线支付、退款、评价、司机收入和提现。
-- 预约单、拼车、优惠券、动态加价、推送通知。
+- 在线支付、退款、司机收入和提现。
+- 预约单（已实现，见仓库根目录 [RESERVATION_DEVELOPMENT_PLAN.md](./RESERVATION_DEVELOPMENT_PLAN.md)）、拼车、优惠券、动态加价、推送通知。
 - WebSocket、完整轨迹历史和轨迹回放；第一阶段只保存/展示最新位置。
 - 乘客端和司机端互相复用角色业务模型或把订单状态机移入 common。

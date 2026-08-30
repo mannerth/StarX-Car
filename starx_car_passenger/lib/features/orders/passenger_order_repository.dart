@@ -13,14 +13,18 @@ class PassengerOrderRepository {
   Future<OrderQuote> quote({
     required Place pickup,
     required Place destination,
+    OrderType orderType = OrderType.instant,
+    DateTime? scheduledPickupTime,
     CancelToken? cancelToken,
   }) async => OrderQuote.fromJson(
     await _api.post(
           '/orders/quote',
-          data: {
-            'pickup': pickup.toJson(),
-            'destination': destination.toJson(),
-          },
+          data: _orderBody(
+            pickup: pickup,
+            destination: destination,
+            orderType: orderType,
+            scheduledPickupTime: scheduledPickupTime,
+          ),
           cancelToken: cancelToken,
         )
         as Map<String, dynamic>,
@@ -29,18 +33,41 @@ class PassengerOrderRepository {
   Future<OrderCreated> create({
     required Place pickup,
     required Place destination,
+    OrderType orderType = OrderType.instant,
+    DateTime? scheduledPickupTime,
     CancelToken? cancelToken,
   }) async => OrderCreated.fromJson(
     await _api.post(
           '/orders',
-          data: {
-            'pickup': pickup.toJson(),
-            'destination': destination.toJson(),
-          },
+          data: _orderBody(
+            pickup: pickup,
+            destination: destination,
+            orderType: orderType,
+            scheduledPickupTime: scheduledPickupTime,
+          ),
           cancelToken: cancelToken,
         )
         as Map<String, dynamic>,
   );
+
+  Map<String, dynamic> _orderBody({
+    required Place pickup,
+    required Place destination,
+    required OrderType orderType,
+    required DateTime? scheduledPickupTime,
+  }) => {
+    'pickup': pickup.toJson(),
+    'destination': destination.toJson(),
+    if (orderType != OrderType.instant) 'orderType': orderTypeToJson(orderType),
+    if (orderType == OrderType.scheduled && scheduledPickupTime != null)
+      'scheduledPickupTime': _serverTime(scheduledPickupTime),
+  };
+
+  static String _serverTime(DateTime value) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${value.year}-${two(value.month)}-${two(value.day)} '
+        '${two(value.hour)}:${two(value.minute)}:${two(value.second)}';
+  }
 
   Future<OrderPage> list({
     int page = 1,

@@ -54,6 +54,122 @@ void main() {
     expect(summary.createdTime, isNotNull);
   });
 
+  test('order models parse scheduled type and pickup time', () {
+    final summary = OrderSummary.fromJson({
+      'orderNo': 'O2026080500000000001',
+      'status': 'SCHEDULED',
+      'orderType': 'SCHEDULED',
+      'scheduledPickupTime': '2026-08-05 10:00:00',
+      'pickupName': '上车点',
+      'destinationName': '目的地',
+      'totalFare': '42.70',
+      'createdTime': '2026-08-04 20:00:00',
+      'estimatedFare': true,
+    });
+
+    expect(summary.status, OrderStatus.scheduled);
+    expect(summary.orderType, OrderType.scheduled);
+    expect(summary.isScheduled, isTrue);
+    expect(summary.scheduledPickupTime, DateTime(2026, 8, 5, 10));
+
+    final quote = OrderQuote.fromJson({
+      'pricingRuleId': 1,
+      'pricingRuleVersion': 1,
+      'estimatedDistanceM': 12001,
+      'estimatedDurationS': 1801,
+      'fare': {
+        'baseFare': '5.00',
+        'distanceFare': '31.20',
+        'drivingTimeFare': '6.50',
+        'waitingFare': '0.00',
+        'totalFare': '42.70',
+      },
+      'orderType': 'SCHEDULED',
+      'scheduledPickupTime': '2026-08-05 10:00:00',
+    });
+
+    expect(quote.orderType, OrderType.scheduled);
+    expect(quote.isScheduled, isTrue);
+    expect(quote.scheduledPickupTime, DateTime(2026, 8, 5, 10));
+  });
+
+  test('order detail parses scheduled fields and keeps old format safe', () {
+    final detail = OrderDetail.fromJson({
+      'orderNo': 'O-RES-1',
+      'status': 'SCHEDULED',
+      'orderType': 'SCHEDULED',
+      'scheduledPickupTime': '2026-08-05 10:00:00',
+      'dispatchTime': '2026-08-05 09:30:00',
+      'pickupPoiId': null,
+      'pickupName': '起点',
+      'pickupAddress': null,
+      'pickupLat': '31.2304',
+      'pickupLng': '121.4737',
+      'destinationPoiId': null,
+      'destinationName': '终点',
+      'destinationAddress': null,
+      'destinationLat': '31.2400',
+      'destinationLng': '121.4800',
+      'estimatedDistanceM': 1200,
+      'estimatedDurationS': 600,
+      'billingDistanceM': 0,
+      'actualDurationS': null,
+      'waitingDurationS': null,
+      'fare': {
+        'baseFare': '5.00',
+        'distanceFare': '0.00',
+        'drivingTimeFare': '2.00',
+        'waitingFare': '0.00',
+        'totalFare': '7.00',
+      },
+      'estimatedFare': true,
+      'driver': null,
+      'events': [
+        {
+          'eventType': 'CREATE',
+          'fromStatus': null,
+          'toStatus': 'SCHEDULED',
+          'operatorType': 'PASSENGER',
+          'createdTime': '2026-08-04 20:00:00',
+          'remark': '预约叫车',
+        },
+      ],
+    });
+
+    expect(detail.status, OrderStatus.scheduled);
+    expect(detail.isScheduled, isTrue);
+    expect(detail.scheduledPickupTime, DateTime(2026, 8, 5, 10));
+    expect(detail.dispatchTime, DateTime(2026, 8, 5, 9, 30));
+    expect(detail.events.single.toStatus, 'SCHEDULED');
+
+    final legacy = OrderDetail.fromJson({
+      'orderNo': 'O-OLD-1',
+      'status': 'PENDING',
+      'pickupName': '起点',
+      'pickupAddress': null,
+      'pickupLat': '31.2304',
+      'pickupLng': '121.4737',
+      'destinationName': '终点',
+      'destinationLat': '31.2400',
+      'destinationLng': '121.4800',
+      'estimatedDistanceM': 1200,
+      'estimatedDurationS': 600,
+      'billingDistanceM': 0,
+      'fare': {
+        'baseFare': '5.00',
+        'distanceFare': '0.00',
+        'drivingTimeFare': '2.00',
+        'waitingFare': '0.00',
+        'totalFare': '7.00',
+      },
+      'estimatedFare': true,
+      'events': [],
+    });
+    expect(legacy.orderType, OrderType.unknown);
+    expect(legacy.isScheduled, isFalse);
+    expect(legacy.scheduledPickupTime, isNull);
+  });
+
   test('driver location and route context use GCJ-02 and stale marker', () {
     final context = RouteContext.fromJson({
       'driverLocation': {

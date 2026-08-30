@@ -88,7 +88,8 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 - 默认即时叫车规则已启用：起步价 5 元含 2 公里；总里程 2 至 12 公里按 3 元/公里、12 公里后按 1.2 元/公里；行程前 30 分钟按 0.2 元/分钟、之后按 0.5 元/分钟；司机到达后前 5 分钟等待免费、之后按 0.5 元/分钟。分段均不足一个单位按一个单位计。
 - 订单状态流转写入的业务时间统一截断到整秒，与 MySQL `DATETIME` 精度一致，避免数据库舍入纳秒后导致“开始服务时间晚于完成时间”的瞬时 409。
 - 已实现订单评价：乘客可在订单完成后 7 天内对司机提交 1-5 星整数评分和可选文字，一个订单只能评价一次（`order_rating.uk_order_rating_order` 唯一约束兜底并发）。评价写入 `order_rating`，同一事务内原子更新 `driver.rating_sum` 与 `driver.rating_count`，并以 `ROUND(rating_sum / rating_count, 1)` 重算 `driver.rating` 缓存平均分，避免平均值四舍五入后的长期漂移。乘客、司机和管理员可按归属权限查询订单评价；未评价订单返回 `rated=false`；重复评价、订单未完成或超过 7 天时限返回 409。司机可分页查看本人收到的评价，乘客可分页查看本人提交的评价，列表均携带被评价订单号。
-- 支付、收入统计、自动派单、轨迹历史和预约单仍未实现；现有订单表结构为后续业务开发提供数据库基础。
+- 已实现预约叫车：`POST /api/orders/quote` 与 `POST /api/orders` 支持 `orderType=SCHEDULED` + `scheduledPickupTime` 创建预约单。预约单以 `SCHEDULED` 状态等待派单，由预约调度器在预约时间前 `RESERVATION_DISPATCH_AHEAD_MINUTES`（默认 30 分钟）自动转入 `PENDING` 进入司机可抢单池，全程复用即时单的抢单、接驾、服务与结算流程；超过预约时间 `RESERVATION_EXPIRE_GRACE_MINUTES`（默认 30 分钟）仍未接单的预约单由系统自动取消。预约单与进行中即时单可并存；同一乘客同时最多一个未结束预约单；派单前乘客可免费取消。订单列表与详情返回 `orderType`/`scheduledPickupTime`/`dispatchTime`；司机待抢列表自动包含已派单预约单并携带预约上车时间。
+- 支付、收入统计、自动派单、轨迹历史和预约单仍在实现计划中；现有订单表结构为后续业务开发提供数据库基础。
 
 ## API 概览
 
@@ -155,8 +156,8 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 
 | 方法 | 地址 | 角色 | 说明 |
 | --- | --- | --- | --- |
-| `POST` | `/api/orders/quote` | 乘客 | 按 GCJ-02 上车点/目的地获取高德路线和当前默认规则的预估金额。 |
-| `POST` | `/api/orders` | 乘客 | 创建即时 `PENDING` 订单；同一乘客已有未结束订单时返回 409。 |
+| `POST` | `/api/orders/quote` | 乘客 | 按 GCJ-02 上车点/目的地获取高德路线和当前默认规则的预估金额；`orderType=SCHEDULED` 时校验并回显预约时间。 |
+| `POST` | `/api/orders` | 乘客 | 创建即时 `PENDING` 订单或预约 `SCHEDULED` 订单；同一乘客已有未结束即时单时即时下单返回 409，已有未结束预约单时预约下单返回 409。 |
 | `GET` | `/api/passengers/me/orders` | 乘客 | 分页查询本人订单，可按状态筛选。 |
 | `GET` | `/api/drivers/me/orders` | 司机 | 分页查询本人已接订单，可按状态筛选。 |
 | `GET` | `/api/orders/{orderNo}` | 乘客、司机、管理员 | 按归属权限读取订单详情。 |
@@ -206,6 +207,11 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 | `DRIVER_LOCATION_FRESHNESS_SECONDS` | 最新司机位置的保鲜窗口，供后续抢单和乘客查看使用，范围 1--300 秒 | `30` |
 | `DRIVER_LOCATION_MAX_RECORDED_TIME_FUTURE_SECONDS` | 设备记录时间允许超过服务端当前时间的最大秒数，范围 0--600 秒 | `60` |
 | `AMAP_ROUTE_READ_TIMEOUT_MS` | 高德路线服务响应读取超时，范围 100--60000 毫秒 | `5000` |
+| `RESERVATION_DISPATCH_AHEAD_MINUTES` | 预约时间前多少分钟开始派单（`SCHEDULED` 转入 `PENDING`），范围 0--1440 | `30` |
+| `RESERVATION_DISPATCH_INTERVAL_MS` | 预约派单调度器扫描间隔，范围 5000--600000 毫秒 | `30000` |
+| `RESERVATION_MIN_LEAD_MINUTES` | 预约时间最早可为当前时间之后多少分钟，范围 1--1440 | `30` |
+| `RESERVATION_MAX_ADVANCE_DAYS` | 预约时间最远可为当前时间之后多少天，范围 1--30 | `7` |
+| `RESERVATION_EXPIRE_GRACE_MINUTES` | 超过预约时间多少分钟后系统自动取消未接单的 `PENDING` 预约单，范围 1--1440 | `30` |
 | `UPLOAD_PATH` | 上传目录，预留 | 空 |
 | `IMAGE_SERVICE_BASE_URL` | 图床 API 基础地址 | `https://image.foofish.work/api/v1` |
 | `IMAGE_SERVICE_EMAIL` | 图床授权邮箱，必填 | 空 |
@@ -280,5 +286,5 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 ## 当前未实现的业务
 
-项目根目录描述了网约车课程设计的完整目标。即时叫车一期已完成报价、下单、抢单、订单状态流转、HTTP 轮询司机位置、服务中路线规划上下文、最终结算和管理员计价规则管理；仍未实现预约单、自动派单、轨迹历史、支付/退款、收入统计和调度规则。
+项目根目录描述了网约车课程设计的完整目标。即时叫车与预约叫车已完成报价、下单、抢单、订单状态流转、HTTP 轮询司机位置、服务中路线规划上下文、最终结算、管理员计价规则管理和预约定时派单；仍未实现自动派单、轨迹历史、支付/退款、收入统计和调度规则。
 

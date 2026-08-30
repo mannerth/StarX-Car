@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-08-30
+
+### 预约调度配置文案修正
+
+- 修复预约单超时自动取消原因固定写为“30分钟”的问题；现在 `ride_order.cancel_reason` 与 `CANCEL` 订单事件会使用实际的 `RESERVATION_EXPIRE_GRACE_MINUTES` 配置值。补充非默认宽限期（45 分钟）单测，避免运营调整配置后留下错误审计信息。
+
+### 预约单（预约打车）后端能力 R1--R5
+
+- 新增 `OrderType` 枚举（`INSTANT`/`SCHEDULED`，存储于 `ride_order.order_type`）；`OrderStatus` 新增 `SCHEDULED`；`OrderEventType` 新增 `DISPATCH`；`RideOrder` 实体映射新增 `orderType`、`scheduledPickupTime`、`dispatchTime` 三列。
+- 新增 `ReservationProperties` 配置（`reservation.*`）并启用 `@EnableScheduling`；调度器 `ReservationDispatchScheduler` 每 `RESERVATION_DISPATCH_INTERVAL_MS`（默认 30s）运行，`ReservationDispatchServiceImpl` 以 `order_type + status + scheduled_pickup_time` 联合索引扫描：到达派单窗口（默认提前 30 分钟）的 `SCHEDULED` 订单条件更新为 `PENDING` 并写 `DISPATCH` 事件；超过预约时间 `RESERVATION_EXPIRE_GRACE_MINUTES`（默认 30 分钟）仍未接单的 `PENDING` 预约单以 `system` 身份自动取消并写 `CANCEL` 事件。调度事务失败整体回滚，绝不触碰即时单。
+- `POST /api/orders/quote` 与 `POST /api/orders` 扩展 `OrderQuoteRequest`：可选 `orderType`（默认 `INSTANT`）+ `scheduledPickupTime`；`SCHEDULED` 校验预约时间处于 `RESERVATION_MIN_LEAD_MINUTES`（默认 30 分钟）至 `RESERVATION_MAX_ADVANCE_DAYS`（默认 7 天）窗口，`INSTANT` 携带预约时间返回 400。预约创建分支不检查即时活动单（可与进行中即时单并存），但同一乘客同时最多一个 `SCHEDULED`/`PENDING` 预约单，冲突返回 409；创建写 `SCHEDULED` 订单 + `CREATE` 事件（`to_status=SCHEDULED`），`dispatch_time` 置空，即时单 `dispatch_time=created_time`。
+- 状态机新增 `SCHEDULED -> PENDING`（调度器）与 `SCHEDULED -> CANCELLED`（乘客）；乘客可在派单前免费取消 `SCHEDULED` 订单，派单后沿用即时单取消规则。
+- 订单列表/详情响应增加 `orderType`、`scheduledPickupTime`、`dispatchTime`（`@JsonFormat` 为 `yyyy-MM-dd HH:mm:ss`）；司机待抢列表自动包含已派单的预约单（携带预约时间），不再按时间过滤（宽限期内仍可抢，超时由调度器清理）。
+- 测试：新增 `ReservationDispatchServiceImplTests`（派单、跳过并发、过期清理、查询条件范围）4 项；`OrderServiceImplTests` 新增预约报价/创建/冲突/并存 6 项；`OrderStateMachineTests` 新增预约迁移 1 项；App MockMvc 新增预约报价/创建与 OpenAPI 用例；`OrderDatabaseSmokeIT` 新增预约全流程真实库烟测（创建 SCHEDULED、重复 409、即时并存、乘客取消、派单转 PENDING + DISPATCH 事件、待抢列表可见、司机抢单、系统过期清理）。全量默认测试 117 项通过，真实库烟测 2 项通过。
+- `create_sql.md` 已包含 `ride_order` 三列与 `idx_ride_order_type_status_scheduled` 索引（见下方 R0 记录）。
+
+### R0：预约单数据库基础
+
+- `ride_order` 新增 `order_type`（`INSTANT`/`SCHEDULED`，默认 `INSTANT`）、`scheduled_pickup_time`（预约上车时间，即时单为 NULL）、`dispatch_time`（进入可抢单 PENDING 的时间，即时单等于创建时间）三列，位置分别位于 `order_no`、`destination_lng`、`created_time` 之后；存量即时单均使用默认值/空值，不受影响。
+- 新增联合索引 `idx_ride_order_type_status_scheduled (order_type, status, scheduled_pickup_time)`，支撑预约派单调度器按类型、状态与预约时间扫描。
+- 已连接线上库执行 ALTER 与 CREATE INDEX 并 `SHOW CREATE TABLE` 验证通过；`create_sql.md` 同步新库建表与存量库升级 ALTER。
+- `ride_order.cancelled_by` 语义扩展：除 `passenger`、`driver` 外，预约单过期清理将使用 `system`；`ride_order_event.event_type` 将新增 `DISPATCH`（`SCHEDULED -> PENDING`），随预约单实现（R1+）落地。
+
 ## 2026-08-14
 
 ### 订单详情司机与车辆信息（支持乘客联系司机）

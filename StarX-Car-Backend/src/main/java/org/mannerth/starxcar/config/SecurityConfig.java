@@ -4,6 +4,7 @@ import org.mannerth.starxcar.security.JwtAuthenticationFilter;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -22,8 +23,9 @@ import org.mannerth.starxcar.web.RestAuthenticationEntryPoint;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@EnableScheduling
 @EnableConfigurationProperties({JwtProperties.class, AdminProperties.class, ImageUploadProperties.class,
-        DriverLocationProperties.class})
+        DriverLocationProperties.class, ReservationProperties.class})
 public class SecurityConfig {
 
     @Bean

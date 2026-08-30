@@ -23,6 +23,14 @@ public interface RideOrderMapper extends BaseMapper<RideOrder> {
 
     @Update("""
             UPDATE ride_order
+            SET status = 'PENDING', dispatch_time = #{dispatchTime}, version = version + 1
+            WHERE id = #{orderId} AND status = 'SCHEDULED' AND order_type = 'SCHEDULED' AND version = #{version}
+            """)
+    int dispatchReservation(@Param("orderId") Long orderId, @Param("version") Long version,
+                            @Param("dispatchTime") LocalDateTime dispatchTime);
+
+    @Update("""
+            UPDATE ride_order
             SET status = 'CANCELLED', cancelled_time = #{cancelledTime}, cancelled_by = #{cancelledBy},
                 cancel_reason = #{cancelReason}, version = version + 1
             WHERE id = #{orderId} AND status = #{expectedStatus} AND version = #{version}

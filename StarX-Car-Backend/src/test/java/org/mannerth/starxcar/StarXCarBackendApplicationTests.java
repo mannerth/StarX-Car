@@ -24,9 +24,11 @@ import org.mannerth.starxcar.order.RideOrderMapper;
 import org.mannerth.starxcar.order.DriverLocationMapper;
 import org.mannerth.starxcar.order.DriverDispatchService;
 import org.mannerth.starxcar.order.OrderLifecycleService;
+import org.mannerth.starxcar.order.ReservationDispatchService;
 import org.mannerth.starxcar.order.OrderCompletionService;
 import org.mannerth.starxcar.order.PassengerTripLocationService;
 import org.mannerth.starxcar.order.OrderStatus;
+import org.mannerth.starxcar.order.OrderType;
 import org.mannerth.starxcar.order.response.FareQuoteResponse;
 import org.mannerth.starxcar.order.response.OrderCreatedResponse;
 import org.mannerth.starxcar.order.response.OrderQuoteResponse;
@@ -129,6 +131,9 @@ class StarXCarBackendApplicationTests {
 
     @MockitoBean
     private OrderLifecycleService orderLifecycleService;
+
+    @MockitoBean
+    private ReservationDispatchService reservationDispatchService;
 
     @MockitoBean
     private OrderCompletionService orderCompletionService;
@@ -366,7 +371,8 @@ class StarXCarBackendApplicationTests {
     void passengerCanQuoteAndCreateAnImmediateOrder() throws Exception {
         OrderQuoteResponse quote = new OrderQuoteResponse(1L, 1, 12_001, 1_801,
                 new FareQuoteResponse(new java.math.BigDecimal("5.00"), new java.math.BigDecimal("31.20"),
-                        new java.math.BigDecimal("6.50"), new java.math.BigDecimal("0.00"), new java.math.BigDecimal("42.70")));
+                        new java.math.BigDecimal("6.50"), new java.math.BigDecimal("0.00"), new java.math.BigDecimal("42.70")),
+                OrderType.INSTANT, null);
         given(orderService.quote(any())).willReturn(quote);
         given(orderService.create(org.mockito.ArgumentMatchers.eq(1L), any()))
                 .willReturn(new OrderCreatedResponse("O2026080420000000000000", OrderStatus.PENDING, quote));
@@ -394,6 +400,38 @@ class StarXCarBackendApplicationTests {
     }
 
     @Test
+    void passengerCanQuoteAndCreateScheduledReservation() throws Exception {
+        java.time.LocalDateTime pickupTime = java.time.LocalDateTime.of(2026, 8, 5, 10, 0);
+        OrderQuoteResponse quote = new OrderQuoteResponse(1L, 1, 12_001, 1_801,
+                new FareQuoteResponse(new java.math.BigDecimal("5.00"), new java.math.BigDecimal("31.20"),
+                        new java.math.BigDecimal("6.50"), new java.math.BigDecimal("0.00"), new java.math.BigDecimal("42.70")),
+                OrderType.SCHEDULED, pickupTime);
+        given(orderService.quote(any())).willReturn(quote);
+        given(orderService.create(org.mockito.ArgumentMatchers.eq(1L), any()))
+                .willReturn(new OrderCreatedResponse("O2026080420000000000001", OrderStatus.SCHEDULED, quote));
+        String body = """
+                {"pickup":{"poiId":"pickup","name":"天安门","address":"北京市东城区","latitude":39.916527,"longitude":116.397128},
+                 "destination":{"poiId":"destination","name":"外滩","address":"上海市黄浦区","latitude":31.230416,"longitude":121.473701},
+                 "orderType":"SCHEDULED","scheduledPickupTime":"2026-08-05 10:00:00"}
+                """;
+
+        mockMvc.perform(post("/api/orders/quote")
+                        .header("Authorization", "Bearer " + passengerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.orderType").value("SCHEDULED"));
+
+        mockMvc.perform(post("/api/orders")
+                        .header("Authorization", "Bearer " + passengerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("SCHEDULED"));
+    }
+
+    @Test
     void orderQuoteRejectsDriverRoleAndOpenApiDocumentsOrderPaths() throws Exception {
         mockMvc.perform(post("/api/orders/quote")
                         .header("Authorization", "Bearer " + driverToken())
@@ -414,7 +452,8 @@ class StarXCarBackendApplicationTests {
     @Test
     void passengerCanListOwnOrdersThroughStandardEnvelope() throws Exception {
         given(orderQueryService.listPassengerOrders(1L, 1, 20, null)).willReturn(new OrderPageResponse(1, 20, 1,
-                java.util.List.of(new OrderSummaryResponse("O20260804001", OrderStatus.PENDING, "天安门", "外滩",
+                java.util.List.of(new OrderSummaryResponse("O20260804001", OrderStatus.PENDING, OrderType.INSTANT, null,
+                        "天安门", "外滩",
                         new java.math.BigDecimal("42.70"), java.time.LocalDateTime.of(2026, 8, 4, 20, 0), true))));
 
         mockMvc.perform(get("/api/passengers/me/orders")
@@ -472,7 +511,8 @@ class StarXCarBackendApplicationTests {
     @Test
     void driverCanListPendingOrdersAndAcceptOne() throws Exception {
         given(driverDispatchService.listPendingOrders(1L, 1, 20)).willReturn(new OrderPageResponse(1, 20, 1,
-                java.util.List.of(new OrderSummaryResponse("O20260805001", OrderStatus.PENDING, "天安门", "外滩",
+                java.util.List.of(new OrderSummaryResponse("O20260805001", OrderStatus.PENDING, OrderType.INSTANT, null,
+                        "天安门", "外滩",
                         new java.math.BigDecimal("42.70"), java.time.LocalDateTime.of(2026, 8, 5, 10, 0), true))));
         given(driverDispatchService.acceptOrder(1L, "O20260805001")).willReturn(new OrderAcceptedResponse(
                 "O20260805001", OrderStatus.ACCEPTED, 7L, java.time.LocalDateTime.of(2026, 8, 5, 10, 1)));

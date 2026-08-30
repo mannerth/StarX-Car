@@ -154,7 +154,10 @@
 
 ### POST `/orders/quote`
 
-仅 `passenger`。请求为 `{"pickup": <Place>, "destination": <Place>}`。成功返回：
+仅 `passenger`。请求为 `{"pickup": <Place>, "destination": <Place>}`，可附加
+`"orderType": "INSTANT"|"SCHEDULED"`（缺省 `INSTANT`）与
+`"scheduledPickupTime": "yyyy-MM-dd HH:mm:ss"`（仅 `SCHEDULED` 必填，须处于预约时间窗口：
+最早当前时间后 30 分钟、最远 7 天，后端校验）。成功返回：
 
 ```json
 {
@@ -168,17 +171,21 @@
     "drivingTimeFare": 6.50,
     "waitingFare": 0.00,
     "totalFare": 41.50
-  }
+  },
+  "orderType": "INSTANT",
+  "scheduledPickupTime": null
 }
 ```
 
-报价由服务端路线和当前规则计算，仅用于展示；路线/规则不可用返回 `503`。
+报价由服务端路线和当前规则计算，仅用于展示；路线/规则不可用返回 `503`，预约时间非法返回 `400`。
 
 ### POST `/orders`
 
 仅 `passenger`。请求与报价相同，客户端不得提交或依赖客户端计算的金额。服务端会
-重新规划、计价并创建 `PENDING` 订单，HTTP `201` 返回 `orderNo`、`status` 和 `quote`。
-失败：`400/401/403/404/409/503`；`409` 表示当前乘客存在未结束订单。
+重新规划、计价并创建订单：`INSTANT` 创建 `PENDING` 即时订单，`SCHEDULED` 创建
+`SCHEDULED` 预约订单（等待派单，调度器在预约时间前 30 分钟自动转入 `PENDING`）。
+HTTP `201` 返回 `orderNo`、`status` 和 `quote`。
+失败：`400/401/403/404/409/503`；`409` 表示当前乘客存在未结束即时订单，或存在未结束预约订单。
 
 ### GET `/passengers/me/orders?page=&size=&status=`
 
@@ -329,18 +336,25 @@
 ## 6. 状态机与客户端行为
 
 ```text
-PENDING -> ACCEPTED -> DRIVER_ARRIVED -> IN_SERVICE -> COMPLETED
-    |          |
-    +----------+----------> CANCELLED
+SCHEDULED --[调度器到派单窗口]--> PENDING --> ACCEPTED --> DRIVER_ARRIVED --> IN_SERVICE --> COMPLETED
+    |                              |             |
+    +---[乘客取消]---> CANCELLED   +---[乘客取消]---+
+    |                              |             |
+    +---[超预约时间30分钟未派单]--->+---[司机取消]--+
+             (system 自动取消)
 ```
 
-- 乘客可取消：`PENDING`、`ACCEPTED`。
+- 预约单 `SCHEDULED`（等待派单）：乘客可随时免费取消；调度器在预约时间前 30 分钟转入 `PENDING`。
+- 乘客可取消：`SCHEDULED`、`PENDING`、`ACCEPTED`。
 - 司机可取消：自己已接的 `ACCEPTED`。
+- 超过预约时间 30 分钟仍未接单的 `PENDING` 预约单由系统自动取消（`cancelledBy=system`）。
 - 司机位置查询：`ACCEPTED`、`DRIVER_ARRIVED`、`IN_SERVICE`。
 - 路线上下文：仅 `IN_SERVICE`。
 - `COMPLETED`、`CANCELLED` 为终态；进入终态后停止轮询、位置上报和路线规划。
 - 等待费、行程时间费和距离费均由后端计价；等待前 5 分钟是否免费及分段价格以订单
   规则快照为准，客户端只展示响应字段。
+- 列表与详情响应新增 `orderType`（`INSTANT`/`SCHEDULED`）与 `scheduledPickupTime`；
+  详情另含 `dispatchTime`（进入 `PENDING` 的时间）。客户端对未知 `orderType` 按即时单处理。
 
 ## 7. 当前契约偏差与待确认项
 

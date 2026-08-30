@@ -25,6 +25,8 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
   Place? _destination;
   OrderQuote? _quote;
   AmapDrivingRoute? _route;
+  OrderType _orderType = OrderType.instant;
+  DateTime? _scheduledPickupTime;
   bool _loading = false;
   bool _locating = false;
   bool _routing = false;
@@ -179,8 +181,45 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
     }
   }
 
+  Future<void> _pickScheduledTime() async {
+    final now = DateTime.now();
+    final base = _scheduledPickupTime ?? now.add(const Duration(hours: 1));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: base,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 7)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(base),
+    );
+    if (time == null || !mounted) return;
+    final picked = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    if (picked.isBefore(now.add(const Duration(minutes: 30)))) {
+      _showMessage('预约时间需晚于当前时间至少 30 分钟。');
+      return;
+    }
+    setState(() {
+      _scheduledPickupTime = picked;
+      _quote = null;
+    });
+  }
+
   Future<void> _quoteRide() async {
     if (_pickup == null || _destination == null) return;
+    if (_orderType == OrderType.scheduled &&
+        _scheduledPickupTime == null) {
+      _showMessage('请先选择预约上车时间。');
+      return;
+    }
     final validationError = _validatePlaces(_pickup!, _destination!);
     if (validationError != null) {
       _showMessage(validationError);
@@ -195,6 +234,8 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
           .quote(
             pickup: _pickup!,
             destination: _destination!,
+            orderType: _orderType,
+            scheduledPickupTime: _scheduledPickupTime,
             cancelToken: cancelToken,
           );
       if (mounted) setState(() => _quote = quote);
@@ -217,6 +258,8 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
           .create(
             pickup: _pickup!,
             destination: _destination!,
+            orderType: _orderType,
+            scheduledPickupTime: _scheduledPickupTime,
             cancelToken: cancelToken,
           );
       if (!mounted) return;
@@ -250,7 +293,7 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
     final routePoints = _route?.points ?? const <GeoPoint>[];
     final viewportPoints = routePoints.isNotEmpty ? routePoints : markers;
     return Scaffold(
-      appBar: AppBar(title: const Text('即时叫车')),
+      appBar: AppBar(title: const Text('叫车')),
       body: Column(
         children: [
           Material(
@@ -259,6 +302,26 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Column(
                 children: [
+                  SegmentedButton<OrderType>(
+                    segments: const [
+                      ButtonSegment(
+                        value: OrderType.instant,
+                        label: Text('即时叫车'),
+                      ),
+                      ButtonSegment(
+                        value: OrderType.scheduled,
+                        label: Text('预约叫车'),
+                      ),
+                    ],
+                    selected: {_orderType},
+                    onSelectionChanged: (selection) {
+                      setState(() {
+                        _orderType = selection.first;
+                        _quote = null;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
                   _PlaceSelector(
                     label: '上车地',
                     place: _pickup,
@@ -272,6 +335,23 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
                     color: Colors.red.shade700,
                     onTap: () => _choosePlace(pickup: false),
                   ),
+                  if (_orderType == OrderType.scheduled) ...[
+                    const Divider(height: 1, indent: 32),
+                    _PlaceSelector(
+                      label: '预约时间',
+                      place: _scheduledPickupTime == null
+                          ? null
+                          : Place(
+                              name: _formatTime(_scheduledPickupTime!),
+                              location: const GeoPoint(
+                                latitude: 0,
+                                longitude: 0,
+                              ),
+                            ),
+                      color: Colors.blue.shade700,
+                      onTap: _pickScheduledTime,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -446,6 +526,11 @@ String? _validatePlaces(Place pickup, Place destination) {
     return '上车点和目的地不能相同。';
   }
   return null;
+}
+
+String _formatTime(DateTime time) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(time.month)}-${two(time.day)} ${two(time.hour)}:${two(time.minute)}';
 }
 
 class _PlaceSearchPage extends StatefulWidget {

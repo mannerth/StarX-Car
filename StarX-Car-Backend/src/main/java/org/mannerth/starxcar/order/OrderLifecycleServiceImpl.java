@@ -44,7 +44,8 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     @Transactional
     public OrderStatusTransitionResponse cancelByPassenger(Long passengerId, String orderNo, String reason) {
         RideOrder order = orderAccessService.requirePassengerOrder(orderNo, passengerId);
-        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.ACCEPTED) {
+        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.ACCEPTED
+                && order.getStatus() != OrderStatus.SCHEDULED) {
             throw conflict("订单当前不可取消");
         }
         return cancel(order, OrderOperatorType.passenger, passengerId, reason);

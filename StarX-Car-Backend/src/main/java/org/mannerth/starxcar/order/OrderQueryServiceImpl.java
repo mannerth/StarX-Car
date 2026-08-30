@@ -73,7 +73,8 @@ public class OrderQueryServiceImpl implements OrderQueryService {
                         .orderByAsc(RideOrderEvent::getId))
                 .stream().map(event -> new OrderEventResponse(event.getEventType(), event.getFromStatus(),
                         event.getToStatus(), event.getOperatorType(), event.getCreatedTime(), event.getRemark())).toList();
-        return new OrderDetailResponse(order.getOrderNo(), order.getStatus(), order.getPickupPoiId(), order.getPickupName(),
+        return new OrderDetailResponse(order.getOrderNo(), order.getStatus(), order.getOrderType(),
+                order.getScheduledPickupTime(), order.getDispatchTime(), order.getPickupPoiId(), order.getPickupName(),
                 order.getPickupAddress(), order.getPickupLat(), order.getPickupLng(), order.getDestinationPoiId(),
                 order.getDestinationName(), order.getDestinationAddress(), order.getDestinationLat(), order.getDestinationLng(),
                 order.getEstimatedDistanceM(), order.getEstimatedDurationS(), order.getBillingDistanceM(),
@@ -86,7 +87,8 @@ public class OrderQueryServiceImpl implements OrderQueryService {
     private OrderPageResponse page(LambdaQueryWrapper<RideOrder> query, long page, long size) {
         IPage<RideOrder> result = rideOrderMapper.selectPage(new Page<>(page, size), query);
         List<OrderSummaryResponse> records = result.getRecords().stream().map(order -> new OrderSummaryResponse(
-                order.getOrderNo(), order.getStatus(), order.getPickupName(), order.getDestinationName(),
+                order.getOrderNo(), order.getStatus(), order.getOrderType(), order.getScheduledPickupTime(),
+                order.getPickupName(), order.getDestinationName(),
                 order.getTotalFare(), order.getCreatedTime(), !isFinalFare(order))).toList();
         return new OrderPageResponse(result.getCurrent(), result.getSize(), result.getTotal(), records);
     }

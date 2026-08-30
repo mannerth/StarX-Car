@@ -103,6 +103,13 @@ driver-location:
   freshness-seconds: ${DRIVER_LOCATION_FRESHNESS_SECONDS:30}
   max-recorded-time-future-seconds: ${DRIVER_LOCATION_MAX_RECORDED_TIME_FUTURE_SECONDS:60}
 
+reservation:
+  dispatch-ahead-minutes: ${RESERVATION_DISPATCH_AHEAD_MINUTES:30}
+  dispatch-interval-ms: ${RESERVATION_DISPATCH_INTERVAL_MS:30000}
+  min-lead-minutes: ${RESERVATION_MIN_LEAD_MINUTES:30}
+  max-advance-days: ${RESERVATION_MAX_ADVANCE_DAYS:7}
+  expire-grace-minutes: ${RESERVATION_EXPIRE_GRACE_MINUTES:30}
+
 
 image-service:
   base-url: ${IMAGE_SERVICE_BASE_URL:https://image.foofish.work/api/v1}

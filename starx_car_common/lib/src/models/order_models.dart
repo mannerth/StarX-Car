@@ -4,6 +4,7 @@ import '../map/place.dart';
 /// Order states returned by the backend. [unknown] keeps older clients
 /// readable when the server adds a new terminal or intermediate state.
 enum OrderStatus {
+  scheduled,
   pending,
   accepted,
   driverArrived,
@@ -15,6 +16,8 @@ enum OrderStatus {
 
 OrderStatus orderStatusFromJson(Object? value) {
   switch (value?.toString()) {
+    case 'SCHEDULED':
+      return OrderStatus.scheduled;
     case 'PENDING':
       return OrderStatus.pending;
     case 'ACCEPTED':
@@ -34,6 +37,8 @@ OrderStatus orderStatusFromJson(Object? value) {
 
 String orderStatusToJson(OrderStatus value) {
   switch (value) {
+    case OrderStatus.scheduled:
+      return 'SCHEDULED';
     case OrderStatus.pending:
       return 'PENDING';
     case OrderStatus.accepted:
@@ -48,6 +53,36 @@ String orderStatusToJson(OrderStatus value) {
       return 'CANCELLED';
     case OrderStatus.unknown:
       throw StateError('未知订单状态不能用于请求筛选。');
+  }
+}
+
+/// Order kinds returned by the backend. [unknown] keeps older clients readable
+/// when a server adds a new kind.
+enum OrderType {
+  instant,
+  scheduled,
+  unknown,
+}
+
+OrderType orderTypeFromJson(Object? value) {
+  switch (value?.toString()) {
+    case 'INSTANT':
+      return OrderType.instant;
+    case 'SCHEDULED':
+      return OrderType.scheduled;
+    default:
+      return OrderType.unknown;
+  }
+}
+
+String orderTypeToJson(OrderType value) {
+  switch (value) {
+    case OrderType.instant:
+      return 'INSTANT';
+    case OrderType.scheduled:
+      return 'SCHEDULED';
+    case OrderType.unknown:
+      throw StateError('未知订单类型不能用于请求。');
   }
 }
 
@@ -122,6 +157,8 @@ class OrderSummary {
   const OrderSummary({
     required this.orderNo,
     required this.status,
+    this.orderType = OrderType.instant,
+    this.scheduledPickupTime,
     required this.pickupName,
     required this.destinationName,
     required this.totalFare,
@@ -131,15 +168,23 @@ class OrderSummary {
 
   final String orderNo;
   final OrderStatus status;
+  final OrderType orderType;
+
+  /// The requested pickup time of a scheduled order; null for instant orders.
+  final DateTime? scheduledPickupTime;
   final String pickupName;
   final String destinationName;
   final String totalFare;
   final DateTime? createdTime;
   final bool estimatedFare;
 
+  bool get isScheduled => orderType == OrderType.scheduled;
+
   factory OrderSummary.fromJson(Map<String, dynamic> json) => OrderSummary(
     orderNo: json['orderNo'] as String,
     status: orderStatusFromJson(json['status']),
+    orderType: orderTypeFromJson(json['orderType']),
+    scheduledPickupTime: _dateTime(json['scheduledPickupTime']),
     pickupName: json['pickupName'] as String,
     destinationName: json['destinationName'] as String,
     totalFare: _decimal(json['totalFare']),
@@ -215,6 +260,8 @@ class OrderQuote {
     required this.estimatedDistanceM,
     required this.estimatedDurationS,
     required this.fare,
+    this.orderType = OrderType.instant,
+    this.scheduledPickupTime,
   });
 
   final int pricingRuleId;
@@ -222,6 +269,10 @@ class OrderQuote {
   final int estimatedDistanceM;
   final int estimatedDurationS;
   final FareQuote fare;
+  final OrderType orderType;
+  final DateTime? scheduledPickupTime;
+
+  bool get isScheduled => orderType == OrderType.scheduled;
 
   factory OrderQuote.fromJson(Map<String, dynamic> json) => OrderQuote(
     pricingRuleId: (json['pricingRuleId'] as num).toInt(),
@@ -229,6 +280,8 @@ class OrderQuote {
     estimatedDistanceM: (json['estimatedDistanceM'] as num).toInt(),
     estimatedDurationS: (json['estimatedDurationS'] as num).toInt(),
     fare: FareQuote.fromJson(json['fare'] as Map<String, dynamic>),
+    orderType: orderTypeFromJson(json['orderType']),
+    scheduledPickupTime: _dateTime(json['scheduledPickupTime']),
   );
 }
 
@@ -267,6 +320,9 @@ class OrderDetail {
   const OrderDetail({
     required this.orderNo,
     required this.status,
+    this.orderType = OrderType.instant,
+    this.scheduledPickupTime,
+    this.dispatchTime,
     required this.pickup,
     required this.destination,
     required this.estimatedDistanceM,
@@ -291,6 +347,13 @@ class OrderDetail {
 
   final String orderNo;
   final OrderStatus status;
+  final OrderType orderType;
+
+  /// The requested pickup time of a scheduled order; null for instant orders.
+  final DateTime? scheduledPickupTime;
+
+  /// When the order entered the grabbable PENDING state.
+  final DateTime? dispatchTime;
   final Place pickup;
   final Place destination;
   final int estimatedDistanceM;
@@ -300,6 +363,8 @@ class OrderDetail {
   final int? waitingDurationS;
   final FareQuote fare;
   final bool estimatedFare;
+
+  bool get isScheduled => orderType == OrderType.scheduled;
 
   /// The passenger's last four phone digits, used by the driver to confirm
   /// the passenger identity before starting service.
@@ -318,6 +383,9 @@ class OrderDetail {
   factory OrderDetail.fromJson(Map<String, dynamic> json) => OrderDetail(
     orderNo: json['orderNo'] as String,
     status: orderStatusFromJson(json['status']),
+    orderType: orderTypeFromJson(json['orderType']),
+    scheduledPickupTime: _dateTime(json['scheduledPickupTime']),
+    dispatchTime: _dateTime(json['dispatchTime']),
     pickup: _place(json, 'pickup'),
     destination: _place(json, 'destination'),
     estimatedDistanceM: (json['estimatedDistanceM'] as num).toInt(),

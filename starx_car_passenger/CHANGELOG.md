@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- 新增预约叫车：叫车页顶部增加「即时叫车/预约叫车」切换；预约模式需选择预约上车时间（最早当前时间后 30 分钟、最远 7 天，由后端校验），报价与下单携带 `orderType=SCHEDULED` 与 `scheduledPickupTime`，创建成功后进入「等待派单」状态。
+- 行程列表/详情适配预约单：列表显示预约上车时间，筛选新增「待派单」；详情在 `SCHEDULED` 状态展示预约上车时间与「系统将在预约时间前 30 分钟开始派单，派单前可免费取消」提示，并支持派单前取消订单；`SCHEDULED -> PENDING` 流转由既有状态轮询自动承接。
+- `PassengerOrderRepository` 的 `quote`/`create` 新增可选 `orderType` 与 `scheduledPickupTime` 参数，预约时间按 `yyyy-MM-dd HH:mm:ss` 序列化；Repository 契约测试新增预约报价与预约创建 2 项。
+
 - 行程详情页地图信息下方新增司机与车辆信息卡：接单司机评分、脱敏手机号、车牌号和车辆品牌/颜色/车型；「联系司机」按钮通过 `url_launcher` 以 `tel:` 调起系统拨号，用后端订单详情返回的司机完整手机号预填号码。新增 `url_launcher` 依赖；公共 `OrderDriver` 模型同步解析 `phoneNumber`、`rating`、`carBrand`、`carColor`、`carType`。
 
 - 订单完成后可在行程详情对司机进行 1-5 星评价：未评价时展示星级选择与可选文字输入（最多 500 字），调用 `POST /api/orders/{orderNo}/rating` 提交，提交后只读展示评分、文字与提交时间；重复评价、订单未完成或超过 7 天时限由服务端返回 409，并以 SnackBar 提示。

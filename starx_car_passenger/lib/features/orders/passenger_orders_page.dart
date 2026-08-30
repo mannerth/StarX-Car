@@ -330,6 +330,7 @@ class _PassengerRouteData {
 
 const _orderStatusFilters = <OrderStatus?>[
   null,
+  OrderStatus.scheduled,
   OrderStatus.pending,
   OrderStatus.accepted,
   OrderStatus.driverArrived,
@@ -492,7 +493,7 @@ class _PassengerOrdersPageState extends ConsumerState<PassengerOrdersPage> {
                     '${order.pickupName} -> ${order.destinationName}',
                   ),
                   subtitle: Text(
-                    '${_statusLabel(order.status)}  ${order.estimatedFare ? '预估' : '已结算'} ¥${order.totalFare}',
+                    '${_statusLabel(order.status)}${order.isScheduled && order.scheduledPickupTime != null ? ' · ${_formatTime(order.scheduledPickupTime!)} 上车' : ''}  ${order.estimatedFare ? '预估' : '已结算'} ¥${order.totalFare}',
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(
@@ -573,6 +574,7 @@ class _OrderDetailContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final canCancel =
+        order.status == OrderStatus.scheduled ||
         order.status == OrderStatus.pending ||
         order.status == OrderStatus.accepted;
     return ListView(
@@ -583,6 +585,21 @@ class _OrderDetailContent extends ConsumerWidget {
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: 16),
+        if (order.isScheduled) ...[
+          if (order.scheduledPickupTime != null)
+            Text(
+              '预约上车时间：${_formatTime(order.scheduledPickupTime!)}',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          if (order.status == OrderStatus.scheduled) ...[
+            const SizedBox(height: 4),
+            Text(
+              '等待派单中，系统将在预约时间前 30 分钟开始派单，派单前可免费取消。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          const SizedBox(height: 8),
+        ],
         if (order.status == OrderStatus.accepted ||
             order.status == OrderStatus.driverArrived)
           _ApproachPanel(
@@ -966,6 +983,7 @@ class _LoadError extends StatelessWidget {
 }
 
 IconData _statusIcon(OrderStatus status) => switch (status) {
+  OrderStatus.scheduled => Icons.event_available,
   OrderStatus.pending => Icons.hourglass_top,
   OrderStatus.accepted => Icons.local_taxi,
   OrderStatus.driverArrived => Icons.place,
@@ -976,6 +994,7 @@ IconData _statusIcon(OrderStatus status) => switch (status) {
 };
 
 String _statusLabel(OrderStatus status) => switch (status) {
+  OrderStatus.scheduled => '等待派单',
   OrderStatus.pending => '等待接单',
   OrderStatus.accepted => '司机正在前往',
   OrderStatus.driverArrived => '司机已到达',
@@ -988,6 +1007,7 @@ String _statusLabel(OrderStatus status) => switch (status) {
 String _filterLabel(OrderStatus? status) => status == null
     ? '全部'
     : switch (status) {
+        OrderStatus.scheduled => '待派单',
         OrderStatus.pending => '待接单',
         OrderStatus.accepted => '接驾中',
         OrderStatus.driverArrived => '司机已到',
@@ -996,6 +1016,11 @@ String _filterLabel(OrderStatus? status) => status == null
         OrderStatus.cancelled => '已取消',
         OrderStatus.unknown => '状态更新中',
       };
+
+String _formatTime(DateTime time) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(time.month)}-${two(time.day)} ${two(time.hour)}:${two(time.minute)}';
+}
 
 int _minutes(int seconds) => (seconds / 60).ceil();
 

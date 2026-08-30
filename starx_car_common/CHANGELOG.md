@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `OrderStatus` 新增 `scheduled`（`SCHEDULED`）；新增 `OrderType` 枚举（`instant`/`scheduled`/`unknown`）与 `orderTypeFromJson`/`orderTypeToJson`。`OrderSummary`/`OrderDetail` 新增 `orderType`、`scheduledPickupTime`，`OrderDetail` 另新增 `dispatchTime`，并各自提供 `isScheduled`；旧服务端缺少字段时解析为即时单，保持向后兼容。
+
 - `AmapMapView` 为地图注册 `EagerGestureRecognizer` 参与 Flutter 手势竞技场；平台视图放入 `ListView` 等滚动容器时不再被父级滚动识别器抢走指针事件，地图可正常拖动、缩放、旋转和倾斜。
 - POI 搜索移除固定 5 公里硬边界，改为当前城市优先并按定位点距离排序；同城无结果时自动全国兜底。逆地理编码和 POI 结果增加城市、区县及可用距离信息。
 

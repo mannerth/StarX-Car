@@ -1,12 +1,17 @@
 package org.mannerth.starxcar.auth.request;
 
+import org.mannerth.starxcar.constant.GenderEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
-import org.mannerth.starxcar.constant.GenderEnum;
+import jakarta.validation.constraints.Size;
+
+
+
+
+
 
 /** Input accepted when an administrator changes a user's basic account details. */
 public record AdminUserUpdateRequest(

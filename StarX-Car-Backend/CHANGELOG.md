@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-31
+
+### 后端生产级目录重组
+
+- 在不改变数据库表、索引、SQL、HTTP 路径、OpenAPI 契约、配置键或业务流程的前提下，完成后端 Java 包结构重组。认证、乘客、司机、车辆和订单均保留业务域作为一级边界，并在域内拆分 `api`、`application`、`domain`、`infrastructure`、`request`、`response` 职责目录。
+- 将订单的管理运营、计价和评价分别保留为 `order.admin`、`order.pricing`、`order.rating` 子域，并对各子域应用相同分层；订单状态机、实体和枚举归入领域层，事务服务与预约调度归入应用层，MyBatis Mapper 归入基础设施层。
+- 将高德路线与图床客户端从含混的 `infra` 包迁移到根级 `infrastructure` 外部系统适配器目录；同步迁移全部单元测试到与被测应用层、领域层或适配器一致的包路径，便于定位测试覆盖。
+- README 和 AGENTS.md 已记录新的目录规范、职责边界和依赖方向。使用 JDK 21 从零编译 185 个生产源文件通过，`mvnw.cmd test` 全量 121 项测试通过（含 Spring 上下文与 OpenAPI 验证）；本次重组未读取或写入线上数据库，未修改 `create_sql.md`。
+
 ## 2026-08-30
 
 ### 管理端订单监控与预约运营

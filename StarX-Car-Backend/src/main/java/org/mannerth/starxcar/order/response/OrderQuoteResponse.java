@@ -1,10 +1,12 @@
 package org.mannerth.starxcar.order.response;
 
+import org.mannerth.starxcar.order.domain.OrderType;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.mannerth.starxcar.order.OrderType;
-
 import java.time.LocalDateTime;
+
+
+
 
 @Schema(description = "叫车服务端预估结果（即时/预约）")
 public record OrderQuoteResponse(

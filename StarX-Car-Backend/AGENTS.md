@@ -12,17 +12,29 @@
 
 ```text
 src/main/java/org/mannerth/starxcar/
-  auth/         User account, login, registration, refresh-token APIs
-    request/    Authentication and profile request DTOs
-    response/   Authentication and profile response DTOs
-  car/          Vehicle entity, mapper, request DTO, controller
-  passenger/    Passenger entity, mapper, request DTO, controller
-  driver/       Driver entity, mapper, request DTO, controller
+  auth/         User account, login, registration and refresh-token domain
+  car/          Vehicle domain
+  passenger/    Passenger profile domain
+  driver/       Driver, vehicle binding and work-status domain
+  order/        Ride-order domain
+    admin/      Administrator order-operation subdomain
+    pricing/    Pricing-rule subdomain
+    rating/     Order-rating subdomain
+  infrastructure/ External system adapters, such as AMap and image hosting
   security/     JWT issuing/parsing, authentication filter, current-user helpers
   web/          ApiResponse, response advice, exception and security error handlers
   logging/      Trace ID, request logging, application startup logging
   config/       Security, JWT properties, OpenAPI configuration
   constant/     Shared enums and constants
+
+Each business domain and order subdomain uses these responsibility packages:
+
+  api/          HTTP controllers only
+  application/  Services, transactions, schedulers and workflow orchestration
+  domain/       Entities, enums, value objects, state machines and calculations
+  infrastructure/ MyBatis mappers and persistence adapters
+  request/      Input DTOs
+  response/     Output DTOs
 src/main/resources/
   application.yaml
 src/test/java/org/mannerth/starxcar/
@@ -31,7 +43,8 @@ src/test/resources/application-test.yaml
 
 ### Placement rules
 
-- Organize new business features by domain package, not by one global `controller` or `service` package.
+- Organize new business features by domain package, then by the responsibility packages above. Do not place Controllers, Services, entities, or Mappers directly in a domain root and do not create global `controller` or `service` packages.
+- Preserve the dependency direction `api -> application -> domain`. Domain code must not depend on Spring MVC, Web, external HTTP clients, or persistence adapters. Application services may use infrastructure adapters to coordinate a use case.
 - Put input models in `<domain>/request/` and output models in `<domain>/response/`. Use Java records for immutable DTOs unless a mutable DTO is necessary.
 - Keep JPA out of this project. Use MyBatis-Plus entities and `BaseMapper` interfaces; place custom mapper XML under `src/main/resources/mapper/<domain>/` only when BaseMapper is insufficient.
 - Keep controllers thin. Put multi-step business logic and transactions in a service. Use constructor injection only.

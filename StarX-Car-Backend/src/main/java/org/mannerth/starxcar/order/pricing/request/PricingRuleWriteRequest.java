@@ -1,7 +1,6 @@
 package org.mannerth.starxcar.order.pricing.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
@@ -10,9 +9,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-
+import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.List;
+
+
+
+
+
 
 @Schema(description = "管理员完整提交的计价规则草稿；三个收费类型的所有分段必须一次性提供")
 public record PricingRuleWriteRequest(

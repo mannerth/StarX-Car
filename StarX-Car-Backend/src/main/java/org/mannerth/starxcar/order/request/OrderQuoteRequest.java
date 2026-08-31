@@ -1,12 +1,14 @@
 package org.mannerth.starxcar.order.request;
 
+import org.mannerth.starxcar.order.domain.OrderType;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import org.mannerth.starxcar.order.OrderType;
-
+import jakarta.validation.Valid;
 import java.time.LocalDateTime;
+
+
+
 
 @Schema(description = "叫车报价请求（即时/预约）")
 public record OrderQuoteRequest(

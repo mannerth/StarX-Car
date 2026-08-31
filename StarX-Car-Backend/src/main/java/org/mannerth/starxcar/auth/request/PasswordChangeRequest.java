@@ -4,6 +4,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+
+
+
+
+
 public record PasswordChangeRequest(
         @Schema(description = "当前密码，用于验证本人身份", example = "OldPassword123")
         @NotBlank String currentPassword,

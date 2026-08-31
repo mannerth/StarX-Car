@@ -1,7 +1,10 @@
 package org.mannerth.starxcar.order.response;
 
+import org.mannerth.starxcar.order.domain.OrderStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.mannerth.starxcar.order.OrderStatus;
+
+
+
 
 @Schema(description = "即时订单创建结果")
 public record OrderCreatedResponse(

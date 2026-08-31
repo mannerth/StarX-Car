@@ -1,82 +1,83 @@
 package org.mannerth.starxcar;
 
-import org.junit.jupiter.api.Test;
-import org.mannerth.starxcar.auth.UserMapper;
-import org.mannerth.starxcar.auth.User;
-import org.mannerth.starxcar.car.CarMapper;
-import org.mannerth.starxcar.car.Car;
+import org.mannerth.starxcar.auth.domain.User;
+import org.mannerth.starxcar.auth.infrastructure.UserMapper;
+import org.mannerth.starxcar.car.domain.Car;
+import org.mannerth.starxcar.car.infrastructure.CarMapper;
 import org.mannerth.starxcar.constant.UserType;
-import org.mannerth.starxcar.driver.Driver;
-import org.mannerth.starxcar.driver.DriverCarBinding;
-import org.mannerth.starxcar.driver.DriverMapper;
-import org.mannerth.starxcar.driver.DriverCarBindingMapper;
-import org.mannerth.starxcar.driver.DriverWorkService;
-import org.mannerth.starxcar.driver.AdminDriverService;
+import org.mannerth.starxcar.driver.application.AdminDriverService;
+import org.mannerth.starxcar.driver.application.DriverWorkService;
+import org.mannerth.starxcar.driver.domain.Driver;
+import org.mannerth.starxcar.driver.domain.DriverCarBinding;
+import org.mannerth.starxcar.driver.infrastructure.DriverCarBindingMapper;
+import org.mannerth.starxcar.driver.infrastructure.DriverMapper;
 import org.mannerth.starxcar.driver.response.AdminDriverPageResponse;
-import org.mannerth.starxcar.infra.image.ImageService;
-import org.mannerth.starxcar.infra.image.response.ImageUploadResponse;
-import org.mannerth.starxcar.order.pricing.PricingRuleMapper;
-import org.mannerth.starxcar.order.pricing.PricingRuleTierMapper;
-import org.mannerth.starxcar.order.pricing.AdminPricingRuleService;
-import org.mannerth.starxcar.order.OrderService;
-import org.mannerth.starxcar.order.OrderQueryService;
-import org.mannerth.starxcar.order.RideOrderMapper;
-import org.mannerth.starxcar.order.DriverLocationMapper;
-import org.mannerth.starxcar.order.DriverDispatchService;
-import org.mannerth.starxcar.order.OrderLifecycleService;
-import org.mannerth.starxcar.order.ReservationDispatchService;
-import org.mannerth.starxcar.order.OrderCompletionService;
-import org.mannerth.starxcar.order.PassengerTripLocationService;
-import org.mannerth.starxcar.order.admin.AdminOrderService;
+import org.mannerth.starxcar.infrastructure.image.ImageService;
+import org.mannerth.starxcar.infrastructure.image.response.ImageUploadResponse;
+import org.mannerth.starxcar.order.admin.application.AdminOrderService;
 import org.mannerth.starxcar.order.admin.response.AdminOrderPageResponse;
-import org.mannerth.starxcar.order.OrderStatus;
-import org.mannerth.starxcar.order.OrderType;
-import org.mannerth.starxcar.order.response.FareQuoteResponse;
-import org.mannerth.starxcar.order.response.OrderCreatedResponse;
-import org.mannerth.starxcar.order.response.OrderQuoteResponse;
-import org.mannerth.starxcar.order.response.OrderPageResponse;
-import org.mannerth.starxcar.order.response.OrderSummaryResponse;
-import org.mannerth.starxcar.order.response.OrderAcceptedResponse;
-import org.mannerth.starxcar.order.response.OrderStatusTransitionResponse;
-import org.mannerth.starxcar.order.response.OrderCompletionResponse;
-import org.mannerth.starxcar.order.response.DriverLocationResponse;
-import org.mannerth.starxcar.order.response.RideRouteContextResponse;
+import org.mannerth.starxcar.order.application.DriverDispatchService;
+import org.mannerth.starxcar.order.application.OrderCompletionService;
+import org.mannerth.starxcar.order.application.OrderLifecycleService;
+import org.mannerth.starxcar.order.application.OrderQueryService;
+import org.mannerth.starxcar.order.application.OrderService;
+import org.mannerth.starxcar.order.application.PassengerTripLocationService;
+import org.mannerth.starxcar.order.application.ReservationDispatchService;
+import org.mannerth.starxcar.order.domain.OrderStatus;
+import org.mannerth.starxcar.order.domain.OrderType;
+import org.mannerth.starxcar.order.infrastructure.DriverLocationMapper;
+import org.mannerth.starxcar.order.infrastructure.RideOrderMapper;
+import org.mannerth.starxcar.order.pricing.application.AdminPricingRuleService;
+import org.mannerth.starxcar.order.pricing.infrastructure.PricingRuleMapper;
+import org.mannerth.starxcar.order.pricing.infrastructure.PricingRuleTierMapper;
 import org.mannerth.starxcar.order.pricing.response.PricingRulePageResponse;
-import org.mannerth.starxcar.order.rating.OrderRatingMapper;
-import org.mannerth.starxcar.order.rating.RatingService;
+import org.mannerth.starxcar.order.rating.application.RatingService;
+import org.mannerth.starxcar.order.rating.infrastructure.OrderRatingMapper;
 import org.mannerth.starxcar.order.rating.response.OrderRatingResponse;
 import org.mannerth.starxcar.order.rating.response.RatingPageResponse;
 import org.mannerth.starxcar.order.rating.response.RatingSummaryResponse;
+import org.mannerth.starxcar.order.response.DriverLocationResponse;
+import org.mannerth.starxcar.order.response.FareQuoteResponse;
+import org.mannerth.starxcar.order.response.OrderAcceptedResponse;
+import org.mannerth.starxcar.order.response.OrderCompletionResponse;
+import org.mannerth.starxcar.order.response.OrderCreatedResponse;
+import org.mannerth.starxcar.order.response.OrderPageResponse;
+import org.mannerth.starxcar.order.response.OrderQuoteResponse;
+import org.mannerth.starxcar.order.response.OrderStatusTransitionResponse;
+import org.mannerth.starxcar.order.response.OrderSummaryResponse;
+import org.mannerth.starxcar.order.response.RideRouteContextResponse;
+import org.mannerth.starxcar.passenger.domain.Passenger;
+import org.mannerth.starxcar.passenger.infrastructure.PassengerMapper;
 import org.mannerth.starxcar.security.JwtService;
-import org.mannerth.starxcar.passenger.PassengerMapper;
-import org.mannerth.starxcar.passenger.Passenger;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.doThrow;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
-
-import java.util.Map;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+
+
 
 @ActiveProfiles("test")
 @SpringBootTest
@@ -849,4 +850,3 @@ class StarXCarBackendApplicationTests {
     }
 
 }
-

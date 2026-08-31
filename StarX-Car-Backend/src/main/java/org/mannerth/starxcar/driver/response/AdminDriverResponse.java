@@ -1,10 +1,14 @@
 package org.mannerth.starxcar.driver.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+
+
+
+
+
 
 @Schema(description = "管理员审核司机时使用的用户、证件和当前车辆资料")
 public record AdminDriverResponse(

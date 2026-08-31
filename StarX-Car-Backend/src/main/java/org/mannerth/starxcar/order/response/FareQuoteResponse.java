@@ -1,8 +1,10 @@
 package org.mannerth.starxcar.order.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.math.BigDecimal;
+
+
+
 
 @Schema(description = "订单预估或快照金额")
 public record FareQuoteResponse(

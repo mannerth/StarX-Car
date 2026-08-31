@@ -1,8 +1,10 @@
 package org.mannerth.starxcar.order.rating.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.time.LocalDateTime;
+
+
+
 
 @Schema(description = "订单评价查询结果；未评价时 rated 为 false，其余字段为空")
 public record OrderRatingResponse(

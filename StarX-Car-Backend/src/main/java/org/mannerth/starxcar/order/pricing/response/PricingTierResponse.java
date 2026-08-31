@@ -1,10 +1,14 @@
 package org.mannerth.starxcar.order.pricing.response;
 
+import org.mannerth.starxcar.order.domain.FareChargeType;
+import org.mannerth.starxcar.order.domain.RoundingMode;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.mannerth.starxcar.order.FareChargeType;
-import org.mannerth.starxcar.order.RoundingMode;
-
 import java.math.BigDecimal;
+
+
+
+
+
 
 @Schema(description = "已保存的计价分段")
 public record PricingTierResponse(

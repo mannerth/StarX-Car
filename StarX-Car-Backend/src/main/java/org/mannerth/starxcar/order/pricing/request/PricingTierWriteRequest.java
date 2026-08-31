@@ -1,15 +1,19 @@
 package org.mannerth.starxcar.order.pricing.request;
 
+import org.mannerth.starxcar.order.domain.FareChargeType;
+import org.mannerth.starxcar.order.domain.RoundingMode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import org.mannerth.starxcar.order.FareChargeType;
-import org.mannerth.starxcar.order.RoundingMode;
-
 import java.math.BigDecimal;
+
+
+
+
+
 
 @Schema(description = "计价规则的一个分段；距离单位为米，时间单位为秒，区间包含起点但不包含终点")
 public record PricingTierWriteRequest(

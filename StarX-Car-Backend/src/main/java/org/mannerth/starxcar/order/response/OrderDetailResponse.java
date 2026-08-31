@@ -1,13 +1,15 @@
 package org.mannerth.starxcar.order.response;
 
+import org.mannerth.starxcar.order.domain.OrderStatus;
+import org.mannerth.starxcar.order.domain.OrderType;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.mannerth.starxcar.order.OrderStatus;
-import org.mannerth.starxcar.order.OrderType;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+
+
+
 
 @Schema(description = "订单详情；金额在 COMPLETED 前均为预估")
 public record OrderDetailResponse(
@@ -51,4 +53,3 @@ public record OrderDetailResponse(
         events = List.copyOf(events);
     }
 }
-

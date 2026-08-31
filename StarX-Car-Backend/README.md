@@ -17,6 +17,34 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 - springdoc OpenAPI / Swagger UI
 - Maven Wrapper
 
+## 项目结构
+
+后端以业务域为一级边界，在每个业务域内按职责分层。这样既能让订单、认证、司机等业务保持内聚，也能避免 Controller、Service、实体和 Mapper 混放在同一目录。
+
+```text
+src/main/java/org/mannerth/starxcar/
+  auth/                    # 认证与用户账号
+  passenger/               # 乘客资料
+  driver/                  # 司机资料、车辆绑定与出车状态
+  car/                     # 车辆管理
+  order/                   # 订单主域
+    admin/                 # 管理端订单运营子域
+    pricing/               # 计价规则子域
+    rating/                # 订单评价子域
+  infrastructure/          # 高德、图床等外部系统适配器
+  config/ security/ web/ logging/ constant/  # 跨域技术支撑
+```
+
+业务域内统一使用以下目录职责：
+
+- `api`：HTTP Controller，只处理鉴权、参数绑定和响应。
+- `application`：服务接口、实现、调度与事务编排。
+- `domain`：实体、枚举、状态机、值对象和领域计算规则。
+- `infrastructure`：MyBatis Mapper 等持久化适配器。
+- `request`、`response`：面向接口的请求与响应 DTO。
+
+依赖方向为 `api -> application -> domain`，`application` 可依赖同域或跨域的 `infrastructure` 端口实现；`domain` 不依赖 Web、Spring MVC 或外部服务。新增代码必须放入对应业务域和职责目录，禁止重新建立全局 Controller、Service 或 Mapper 聚合目录。
+
 ## 当前已实现能力
 
 ### 认证与账号

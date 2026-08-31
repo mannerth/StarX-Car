@@ -1,8 +1,10 @@
 package org.mannerth.starxcar.order.rating.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.time.LocalDateTime;
+
+
+
 
 @Schema(description = "评价列表项")
 public record RatingSummaryResponse(

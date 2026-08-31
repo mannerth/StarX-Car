@@ -1,11 +1,16 @@
 package org.mannerth.starxcar.auth.request;
 
+import org.mannerth.starxcar.constant.GenderEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import io.swagger.v3.oas.annotations.media.Schema;
-import org.mannerth.starxcar.constant.GenderEnum;
+
+
+
+
+
 
 public record UserProfileUpdateRequest(
         @NotBlank @Size(min = 3, max = 50) String username,

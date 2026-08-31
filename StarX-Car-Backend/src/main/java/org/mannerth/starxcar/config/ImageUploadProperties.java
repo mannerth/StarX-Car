@@ -2,6 +2,11 @@ package org.mannerth.starxcar.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+
+
+
+
+
 @ConfigurationProperties(prefix = "image-service")
 public class ImageUploadProperties {
     private String baseUrl = "https://image.foofish.work/api/v1";

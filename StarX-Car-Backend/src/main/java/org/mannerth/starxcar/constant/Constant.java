@@ -1,5 +1,11 @@
 package org.mannerth.starxcar.constant;
 
+
+
+
+
+
+
 /*
 * 全局通用常量
 * */

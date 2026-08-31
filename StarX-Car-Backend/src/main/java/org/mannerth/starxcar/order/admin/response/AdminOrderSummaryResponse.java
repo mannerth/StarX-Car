@@ -1,11 +1,15 @@
 package org.mannerth.starxcar.order.admin.response;
 
+import org.mannerth.starxcar.order.domain.OrderStatus;
+import org.mannerth.starxcar.order.domain.OrderType;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.mannerth.starxcar.order.OrderStatus;
-import org.mannerth.starxcar.order.OrderType;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
+
+
+
+
 
 @Schema(description = "管理端订单列表项")
 public record AdminOrderSummaryResponse(

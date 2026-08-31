@@ -1,8 +1,13 @@
 package org.mannerth.starxcar.driver.request;
 
+import org.mannerth.starxcar.driver.domain.DriverApprovalDecision;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
-import org.mannerth.starxcar.driver.DriverApprovalDecision;
+
+
+
+
+
 
 @Schema(description = "管理员司机审核决定")
 public record AdminDriverApprovalRequest(

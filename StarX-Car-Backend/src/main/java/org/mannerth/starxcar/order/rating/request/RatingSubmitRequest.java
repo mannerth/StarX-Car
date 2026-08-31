@@ -6,6 +6,11 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+
+
+
+
+
 @Schema(description = "乘客提交司机评价请求；仅已完成订单可评价，一个订单只能评价一次")
 public record RatingSubmitRequest(
         @Schema(description = "1-5 星整数评分", example = "5")

@@ -4,6 +4,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+
+
+
+
+
 @Schema(description = "管理员运营备注")
 public record AdminOrderNoteRequest(
         @NotBlank @Size(max = 500)

@@ -262,6 +262,9 @@ CREATE TABLE ride_order
     KEY idx_ride_order_passenger_created (passenger_id, created_time),
     KEY idx_ride_order_driver_status_created (driver_id, status, created_time),
     KEY idx_ride_order_status_created (status, created_time),
+    KEY idx_ride_order_admin_created (created_time, id),
+    KEY idx_ride_order_admin_type_status_created (order_type, status, created_time, id),
+    KEY idx_ride_order_status_completed_time (status, completed_time),
     KEY idx_ride_order_type_status_scheduled (order_type, status, scheduled_pickup_time)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
@@ -342,6 +345,44 @@ CREATE TABLE order_rating
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 ```
 
+管理端订单监控与预约运营：
+
+```sql
+-- 运营备注仅允许追加，避免覆盖既有运营记录。
+CREATE TABLE order_operation_note
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id     BIGINT       NOT NULL,
+    admin_id     INT          NOT NULL,
+    content      VARCHAR(500) NOT NULL,
+    created_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_order_operation_note_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    CONSTRAINT fk_order_operation_note_admin FOREIGN KEY (admin_id) REFERENCES `user` (id),
+    KEY idx_order_operation_note_order_time (order_id, created_time, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- 仅审计管理员写操作；列表和详情的自动轮询不写入此表。
+CREATE TABLE admin_operation_log
+(
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    admin_id      INT          NOT NULL,
+    action        VARCHAR(40)  NOT NULL COMMENT 'ORDER_CANCEL、RESERVATION_DISPATCH、ORDER_NOTE_CREATE',
+    target_type   VARCHAR(30)  NOT NULL DEFAULT 'ORDER',
+    target_id     BIGINT       NOT NULL,
+    order_id      BIGINT       NULL,
+    before_status VARCHAR(30)  NULL,
+    after_status  VARCHAR(30)  NULL,
+    reason        VARCHAR(500) NULL,
+    trace_id      VARCHAR(64)  NULL,
+    created_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_admin_operation_log_admin FOREIGN KEY (admin_id) REFERENCES `user` (id),
+    CONSTRAINT fk_admin_operation_log_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    KEY idx_admin_operation_log_order_time (order_id, created_time, id),
+    KEY idx_admin_operation_log_admin_time (admin_id, created_time, id),
+    KEY idx_admin_operation_log_target_time (target_type, target_id, created_time, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+```
+
 存量库升级（2026-08-13 评价系统；新建库已包含上述结构，无需执行）：
 
 ```sql
@@ -381,6 +422,47 @@ ALTER TABLE ride_order
 
 CREATE INDEX idx_ride_order_type_status_scheduled
     ON ride_order (order_type, status, scheduled_pickup_time);
+```
+
+存量库升级（2026-08-31 管理端订单监控与预约运营；新建库已包含上述结构，无需执行）：
+
+```sql
+ALTER TABLE ride_order
+    ADD KEY idx_ride_order_admin_created (created_time, id),
+    ADD KEY idx_ride_order_admin_type_status_created (order_type, status, created_time, id),
+    ADD KEY idx_ride_order_status_completed_time (status, completed_time);
+
+CREATE TABLE order_operation_note
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id     BIGINT       NOT NULL,
+    admin_id     INT          NOT NULL,
+    content      VARCHAR(500) NOT NULL,
+    created_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_order_operation_note_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    CONSTRAINT fk_order_operation_note_admin FOREIGN KEY (admin_id) REFERENCES `user` (id),
+    KEY idx_order_operation_note_order_time (order_id, created_time, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE admin_operation_log
+(
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    admin_id      INT          NOT NULL,
+    action        VARCHAR(40)  NOT NULL COMMENT 'ORDER_CANCEL、RESERVATION_DISPATCH、ORDER_NOTE_CREATE',
+    target_type   VARCHAR(30)  NOT NULL DEFAULT 'ORDER',
+    target_id     BIGINT       NOT NULL,
+    order_id      BIGINT       NULL,
+    before_status VARCHAR(30)  NULL,
+    after_status  VARCHAR(30)  NULL,
+    reason        VARCHAR(500) NULL,
+    trace_id      VARCHAR(64)  NULL,
+    created_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_admin_operation_log_admin FOREIGN KEY (admin_id) REFERENCES `user` (id),
+    CONSTRAINT fk_admin_operation_log_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    KEY idx_admin_operation_log_order_time (order_id, created_time, id),
+    KEY idx_admin_operation_log_admin_time (admin_id, created_time, id),
+    KEY idx_admin_operation_log_target_time (target_type, target_id, created_time, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 ```
 
 默认即时叫车计价规则：

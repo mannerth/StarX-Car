@@ -2,6 +2,17 @@
 
 ## 2026-08-30
 
+### 管理端订单监控与预约运营
+
+- 新增 `/api/admin/orders` 管理端订单接口组：分页筛选即时/预约订单、运营汇总、订单详情、计费明细、追加式运营备注和司机最后位置查询；所有接口仅允许 `active admin` 调用，并补齐 OpenAPI 描述。
+- 新增受控运营操作：管理员只能取消 `SCHEDULED`/`PENDING` 订单，或将 `SCHEDULED` 预约订单提前派入 `PENDING`；操作必须携带原因，使用订单版本条件更新，并在同一事务写订单事件与 `admin_operation_log`。不支持取消已接订单或强制释放司机。
+- 新增 `AdminOrderServiceImplTests` 覆盖提前派单、取消和备注追加均写入对应的订单事件及独立管理员审计日志；MockMvc 覆盖管理员权限与新增 OpenAPI 路径。
+
+### 管理端订单监控与预约运营数据库基础
+
+- 已在 MySQL 5.6.50 线上库执行管理端订单监控与预约运营的前置 DDL：`ride_order` 新增 `idx_ride_order_admin_created (created_time, id)`、`idx_ride_order_admin_type_status_created (order_type, status, created_time, id)`、`idx_ride_order_status_completed_time (status, completed_time)` 三个查询索引；新增 `order_operation_note` 追加式运营备注表和 `admin_operation_log` 管理员写操作审计表。
+- `order_operation_note` 以订单、管理员和创建时间关联，仅允许后续业务追加；`admin_operation_log` 保留操作类型、目标、订单状态前后值、原因和 Trace ID，设计上不记录管理端列表/详情自动轮询。已通过 `information_schema` 核对 InnoDB/utf8mb4、索引列顺序、四个外键及全部字段，未写入业务或测试数据。
+
 ### 预约调度配置文案修正
 
 - 修复预约单超时自动取消原因固定写为“30分钟”的问题；现在 `ride_order.cancel_reason` 与 `CANCEL` 订单事件会使用实际的 `RESERVATION_EXPIRE_GRACE_MINUTES` 配置值。补充非默认宽限期（45 分钟）单测，避免运营调整配置后留下错误审计信息。

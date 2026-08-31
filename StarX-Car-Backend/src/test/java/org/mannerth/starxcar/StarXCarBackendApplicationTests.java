@@ -27,6 +27,8 @@ import org.mannerth.starxcar.order.OrderLifecycleService;
 import org.mannerth.starxcar.order.ReservationDispatchService;
 import org.mannerth.starxcar.order.OrderCompletionService;
 import org.mannerth.starxcar.order.PassengerTripLocationService;
+import org.mannerth.starxcar.order.admin.AdminOrderService;
+import org.mannerth.starxcar.order.admin.response.AdminOrderPageResponse;
 import org.mannerth.starxcar.order.OrderStatus;
 import org.mannerth.starxcar.order.OrderType;
 import org.mannerth.starxcar.order.response.FareQuoteResponse;
@@ -142,6 +144,9 @@ class StarXCarBackendApplicationTests {
     private PassengerTripLocationService passengerTripLocationService;
 
     @MockitoBean
+    private AdminOrderService adminOrderService;
+
+    @MockitoBean
     private AdminPricingRuleService adminPricingRuleService;
 
     @MockitoBean
@@ -179,6 +184,29 @@ class StarXCarBackendApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/api/admin/drivers'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/admin/drivers/{driverId}/approval'].put").exists());
+    }
+
+    @Test
+    void adminOrderMonitoringEndpointsRequireAdminAndAppearInOpenApi() throws Exception {
+        User admin = new User();
+        admin.setId(1L);
+        admin.setType(UserType.admin);
+        admin.setStatus("active");
+        given(userMapper.selectById(1L)).willReturn(admin);
+        given(adminOrderService.list(1, 20, null, null, null, null, null, null, null, null))
+                .willReturn(new AdminOrderPageResponse(1, 20, 0, java.util.List.of()));
+
+        mockMvc.perform(get("/api/admin/orders").header("Authorization", "Bearer " + adminToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+        mockMvc.perform(get("/api/admin/orders").header("Authorization", "Bearer " + passengerToken()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/admin/orders'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/admin/orders/{orderNo}/cancel'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/admin/orders/{orderNo}/dispatch'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/admin/orders/{orderNo}/notes'].post").exists());
     }
 
     @Test

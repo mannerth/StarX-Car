@@ -1,6 +1,6 @@
 # StarX-Car 后端
 
-StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前已实现用户认证、乘客/司机资料、司机车辆管理，以及供 Vue 管理端使用的管理员用户管理与密码管理能力。
+StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前已实现用户认证、乘客/司机资料、司机车辆管理、即时与预约订单闭环，以及供 Vue 管理端使用的用户管理、司机审核、计费规则、订单监控和预约运营能力。
 
 数据库建表及触发器脚本见 [create_sql.md](./create_sql.md)。接口在线文档在服务启动后可通过 Swagger UI 查看。
 
@@ -136,6 +136,14 @@ StarX-Car-Backend 是 StarX-Car 网约车系统的 Spring Boot 后端。当前�
 | `PUT` | `/api/admin/users/{userId}` | 编辑用户基础资料 |
 | `POST` | `/api/admin/users/{userId}/reset-password` | 重置任意用户密码为默认密码 |
 | `DELETE` | `/api/admin/users/{userId}` | 删除乘客或司机账号 |
+| `GET` | `/api/admin/orders` | 分页监控即时与预约订单；支持订单号、类型、状态、乘客/司机关键字、创建与预约时间筛选 |
+| `GET` | `/api/admin/orders/summary` | 按创建时间范围获取订单、预约风险和已完成金额摘要 |
+| `GET` | `/api/admin/orders/{orderNo}` | 获取管理员订单详情与状态事件 |
+| `GET` | `/api/admin/orders/{orderNo}/fare-items` | 获取订单分段计费明细 |
+| `GET` / `POST` | `/api/admin/orders/{orderNo}/notes` | 查询或追加不可修改的运营备注 |
+| `GET` | `/api/admin/orders/{orderNo}/driver-location` | 获取订单司机最后位置，不返回历史轨迹 |
+| `POST` | `/api/admin/orders/{orderNo}/cancel` | 管理员以必填原因取消 `SCHEDULED` 或 `PENDING` 订单 |
+| `POST` | `/api/admin/orders/{orderNo}/dispatch` | 管理员以必填原因将 `SCHEDULED` 预约订单提前转为 `PENDING` |
 
 车辆接口（均需要 `ROLE_DRIVER`）：
 

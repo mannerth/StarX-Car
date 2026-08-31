@@ -1,6 +1,6 @@
 # StarX-Car 管理端
 
-StarX-Car-Admin 是网约车系统的后台管理 Web 应用。它面向 `admin` 角色，提供账号登录、用户管理、司机审核、计费规则管理、个人资料维护和密码修改功能。
+StarX-Car-Admin 是网约车系统的后台管理 Web 应用。它面向 `admin` 角色，提供账号登录、订单监控与预约运营、用户管理、司机审核、计费规则管理、个人资料维护和密码修改功能。
 
 后端项目位于相邻的 `../StarX-Car-Backend` 目录；默认开发环境通过 Vite 代理将 `/api` 请求转发到 `http://localhost:8080`。
 
@@ -42,6 +42,13 @@ StarX-Car-Admin 是网约车系统的后台管理 Web 应用。它面向 `admin`
 - 重置任意用户密码为后端配置的默认值，包括管理员账号；前端不会读取或展示默认密码。
 - 删除和重置密码前均要求浏览器二次确认。
 
+### 订单监控与预约运营
+
+- 订单监控支持按订单号、即时/预约类型、订单状态和乘客/司机关键字分页查询；展示脱敏联系方式、行程、预约/派单时间、金额和最终结算状态，并每 30 秒刷新一次。
+- 预约运营页只展示预约订单，每 15 秒刷新；显示预约时间、倒计时、司机接单情况，等待派单的预约订单可填写原因后提前派入待抢池。
+- 订单详情每 10 秒刷新，展示订单状态事件、费用明细、追加式运营备注及司机最后位置文本，不接入地图或历史轨迹。
+- 管理员仅能取消 `SCHEDULED`、`PENDING` 订单；取消和提前派单均必须填写原因。系统记录订单事件与独立管理员写操作审计，不记录自动轮询读取。
+
 ### 个人中心
 
 - 查看并修改当前管理员的用户名、真实姓名、头像地址、邮箱和性别。
@@ -68,7 +75,10 @@ StarX-Car-Admin 是网约车系统的后台管理 Web 应用。它面向 `admin`
 
 | 路由 | 页面 | 访问要求 |
 | --- | --- | --- |
-| `/login` | 管理员登录 | 公开；已登录管理员会自动前往用户管理 |
+| `/login` | 管理员登录 | 公开；已登录管理员会自动前往订单监控 |
+| `/orders` | 订单监控 | 管理员 |
+| `/reservations` | 预约运营 | 管理员 |
+| `/orders/:orderNo` | 订单详情和运营操作 | 管理员 |
 | `/users` | 用户管理 | 管理员 |
 | `/drivers` | 司机审核 | 管理员 |
 | `/pricing` | 计费方式管理 | 管理员 |
@@ -93,6 +103,14 @@ StarX-Car-Admin 是网约车系统的后台管理 Web 应用。它面向 `admin`
 | --- | --- | --- |
 | `POST` | `/api/auth/login` | 管理员登录 |
 | `POST` | `/api/auth/refresh` | 刷新令牌 |
+| `GET` | `/api/admin/orders` | 订单监控筛选和分页 |
+| `GET` | `/api/admin/orders/summary` | 订单运营统计摘要 |
+| `GET` | `/api/admin/orders/{orderNo}` | 订单详情、状态事件和费用 |
+| `GET` | `/api/admin/orders/{orderNo}/fare-items` | 订单计费明细 |
+| `GET` / `POST` | `/api/admin/orders/{orderNo}/notes` | 运营备注查询或追加 |
+| `GET` | `/api/admin/orders/{orderNo}/driver-location` | 司机最后位置文本数据 |
+| `POST` | `/api/admin/orders/{orderNo}/cancel` | 取消等待派单或待抢订单 |
+| `POST` | `/api/admin/orders/{orderNo}/dispatch` | 提前派发等待派单预约订单 |
 | `GET` | `/api/admin/users` | 用户分页、搜索和筛选 |
 | `GET` | `/api/admin/users/{userId}` | 获取用户详情（供后续扩展使用） |
 | `PUT` | `/api/admin/users/{userId}` | 编辑用户资料 |
@@ -158,11 +176,11 @@ VITE_API_BASE_URL=https://api.example.com/api pnpm build
 
 ```text
 src/
-  api/          Axios 封装、用户、司机审核、计费规则和个人中心 API
+  api/          Axios 封装、订单运营、用户、司机审核、计费规则和个人中心 API
   router/       路由定义与管理员访问守卫
   stores/       Pinia 会话状态
   types/        后端响应与领域模型类型
-  views/        登录、用户管理、司机审核、计费管理和个人中心页面
+  views/        登录、订单监控、预约运营、订单详情、用户管理、司机审核、计费管理和个人中心页面
   styles.css    全局样式
 ```
 
@@ -171,4 +189,4 @@ src/
 - 管理端不在浏览器端保存或展示默认密码；默认密码只由后端 `ADMIN_DEFAULT_PASSWORD` 配置决定。
 - 令牌保存在 `localStorage` 便于当前单页应用保持会话。生产部署仍应配合 HTTPS、受信任域名与内容安全策略。
 - 用户列表的权限、删除限制和密码重置权限均由后端再次校验，前端仅负责交互展示。
-- 管理端当前覆盖账号、司机准入和计费规则配置；订单监控、派单干预、支付、评价和实时定位运营能力尚未实现。
+- 管理端当前覆盖账号、司机准入、计费规则、订单监控和预约运营；支付、退款、订单轨迹回放、自动派单和司机收入运营能力尚未实现。

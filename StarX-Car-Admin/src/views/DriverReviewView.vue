@@ -54,7 +54,7 @@ onMounted(() => void load())
 
 <template>
   <div class="admin-shell">
-    <aside><div class="brand"><span>S</span><strong>StarX-Car</strong></div><nav><RouterLink to="/users">用户管理</RouterLink><RouterLink to="/drivers">司机审核</RouterLink><RouterLink to="/pricing">计费管理</RouterLink><RouterLink to="/profile">个人中心</RouterLink></nav><button class="logout" @click="logout">退出登录</button></aside>
+    <aside><div class="brand"><span>S</span><strong>StarX-Car</strong></div><nav><RouterLink to="/orders">订单监控</RouterLink><RouterLink to="/reservations">预约运营</RouterLink><RouterLink to="/users">用户管理</RouterLink><RouterLink to="/drivers">司机审核</RouterLink><RouterLink to="/pricing">计费管理</RouterLink><RouterLink to="/profile">个人中心</RouterLink></nav><button class="logout" @click="logout">退出登录</button></aside>
     <main class="content">
       <header><div><p class="eyebrow">运营管理</p><h1>司机审核</h1><p>核对司机身份、驾驶证和当前车辆资料。</p></div><div class="operator">{{ auth.user?.username }}<small>管理员</small></div></header>
       <section class="panel">

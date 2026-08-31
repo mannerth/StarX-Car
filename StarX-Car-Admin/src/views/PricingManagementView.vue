@@ -115,7 +115,7 @@ onMounted(() => void load())
 
 <template>
   <div class="admin-shell">
-    <aside><div class="brand"><span>S</span><strong>StarX-Car</strong></div><nav><RouterLink to="/users">用户管理</RouterLink><RouterLink to="/drivers">司机审核</RouterLink><RouterLink to="/pricing">计费管理</RouterLink><RouterLink to="/profile">个人中心</RouterLink></nav><button class="logout" @click="logout">退出登录</button></aside>
+    <aside><div class="brand"><span>S</span><strong>StarX-Car</strong></div><nav><RouterLink to="/orders">订单监控</RouterLink><RouterLink to="/reservations">预约运营</RouterLink><RouterLink to="/users">用户管理</RouterLink><RouterLink to="/drivers">司机审核</RouterLink><RouterLink to="/pricing">计费管理</RouterLink><RouterLink to="/profile">个人中心</RouterLink></nav><button class="logout" @click="logout">退出登录</button></aside>
     <main class="content">
       <header><div><p class="eyebrow">运营配置</p><h1>计费方式管理</h1><p>版本化维护起步价、最低消费及里程和时长分段。</p></div><div class="header-actions"><div class="operator">{{ auth.user?.username }}<small>管理员</small></div><button @click="openCreate">新建规则</button></div></header>
       <section class="panel">

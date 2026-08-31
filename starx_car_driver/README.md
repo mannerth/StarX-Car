@@ -1,6 +1,6 @@
 # StarX-Car 司机端
 
-`starx_car_driver` 是 StarX-Car 的司机 Android App，依赖本地 `starx_car_common`。当前已完成司机账号、个人资料、车辆、听单工作台和进行中订单状态流转。
+`starx_car_driver` 是 StarX-Car 的司机 Android App，依赖本地 `starx_car_common`。当前已完成司机账号、个人资料、车辆、听单工作台和进行中订单状态流转；个人中心展示收入余额并提供不可透支的模拟提现入口。
 
 ## 当前状态
 

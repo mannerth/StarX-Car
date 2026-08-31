@@ -15,7 +15,7 @@ public final class PricingFixtures {
 
     public static PricingRuleDefinition defaultRule() {
         return new PricingRuleDefinition(1L, "默认即时叫车规则", 1, PricingRuleStatus.active, true,
-                new BigDecimal("5.00"), 2_000, new BigDecimal("5.00"), List.of(
+                new BigDecimal("5.00"), 2_000, new BigDecimal("5.00"), new BigDecimal("5.00"), List.of(
                 tier(11L, FareChargeType.DISTANCE, 0, 2_000L, 1_000, "0.00", 10),
                 tier(12L, FareChargeType.DISTANCE, 2_000, 12_000L, 1_000, "3.00", 20),
                 tier(13L, FareChargeType.DISTANCE, 12_000, null, 1_000, "1.20", 30),
@@ -42,6 +42,7 @@ public final class PricingFixtures {
         rule.setBaseFare(new BigDecimal("5.00"));
         rule.setIncludedDistanceM(2_000L);
         rule.setMinimumFare(new BigDecimal("5.00"));
+        rule.setArrivalCancelFee(new BigDecimal("5.00"));
         return rule;
     }
 

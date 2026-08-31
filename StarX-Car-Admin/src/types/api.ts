@@ -88,6 +88,7 @@ export interface PricingRule {
   baseFare: number
   includedDistanceM: number
   minimumFare: number
+  arrivalCancelFee: number
   createdBy: number
   updatedBy: number | null
   createdTime: string
@@ -107,11 +108,17 @@ export interface PricingRuleWriteRequest {
   baseFare: number
   includedDistanceM: number
   minimumFare: number
+  arrivalCancelFee: number
   tiers: Omit<PricingTier, 'id'>[]
 }
 
 export type OrderType = 'INSTANT' | 'SCHEDULED'
-export type OrderStatus = 'SCHEDULED' | 'PENDING' | 'ACCEPTED' | 'DRIVER_ARRIVED' | 'IN_SERVICE' | 'COMPLETED' | 'CANCELLED'
+export type OrderStatus = 'SCHEDULED' | 'PENDING' | 'ACCEPTED' | 'DRIVER_ARRIVED' | 'IN_SERVICE' | 'COMPLETED' | 'TERMINATED' | 'CANCELLED'
+
+export type ComplaintStatus = 'OPEN' | 'PROCESSING' | 'RESOLVED'
+export type ComplaintResolutionType = 'APOLOGY' | 'PARTIAL_REFUND' | 'FULL_REFUND' | 'REJECT'
+export interface Complaint { complaintNo: string; orderNo: string; complaintType: string; content: string; status: ComplaintStatus; resolutionType: ComplaintResolutionType | null; refundAmount: number; createdTime: string; resolvedTime: string | null }
+export interface ComplaintPage { page: number; size: number; total: number; records: Complaint[] }
 
 export interface AdminOrderSummary {
   orderNo: string; orderType: OrderType; status: OrderStatus; pickupName: string; destinationName: string

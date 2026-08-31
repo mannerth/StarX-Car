@@ -44,7 +44,7 @@ class FareCalculatorTests {
     void appliesMinimumFareAsAnExplicitBaseAdjustment() {
         PricingRuleDefinition baseRule = PricingFixtures.defaultRule();
         PricingRuleDefinition minimumRule = new PricingRuleDefinition(2L, "最低消费测试", 1,
-                PricingRuleStatus.active, false, new BigDecimal("1.00"), 0, new BigDecimal("5.00"),
+                PricingRuleStatus.active, false, new BigDecimal("1.00"), 0, new BigDecimal("5.00"), new BigDecimal("5.00"),
                 baseRule.tiers().stream().map(tier -> new PricingTierDefinition(tier.id(), tier.chargeType(),
                         tier.rangeStart(), tier.rangeEnd(), tier.unitSize(), BigDecimal.ZERO,
                         tier.roundingMode(), tier.sortNo())).toList());
@@ -67,7 +67,7 @@ class FareCalculatorTests {
                         : tier)
                 .toList();
         PricingRuleDefinition invalidRule = new PricingRuleDefinition(rule.id(), rule.name(), rule.version(),
-                rule.status(), rule.defaultRule(), rule.baseFare(), rule.includedDistanceM(), rule.minimumFare(),
+                rule.status(), rule.defaultRule(), rule.baseFare(), rule.includedDistanceM(), rule.minimumFare(), rule.arrivalCancelFee(),
                 invalidTiers);
 
         assertThatThrownBy(() -> calculator.calculate(invalidRule, 2_001, 0, 0))

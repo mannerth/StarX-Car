@@ -1,5 +1,7 @@
 ## Unreleased
 
+- 新增 `WalletBalance` 与 `WalletApi`，封装跨角色的余额查询、充值和提现 HTTP 传输，不引入角色业务流程。
+
 - `OrderStatus` 新增 `scheduled`（`SCHEDULED`）；新增 `OrderType` 枚举（`instant`/`scheduled`/`unknown`）与 `orderTypeFromJson`/`orderTypeToJson`。`OrderSummary`/`OrderDetail` 新增 `orderType`、`scheduledPickupTime`，`OrderDetail` 另新增 `dispatchTime`，并各自提供 `isScheduled`；旧服务端缺少字段时解析为即时单，保持向后兼容。
 
 - `AmapMapView` 为地图注册 `EagerGestureRecognizer` 参与 Flutter 手势竞技场；平台视图放入 `ListView` 等滚动容器时不再被父级滚动识别器抢走指针事件，地图可正常拖动、缩放、旋转和倾斜。
@@ -64,4 +66,3 @@
 - `OrderDetail` 增加 `passengerPhoneTail` 字段（乘客手机尾号后四位），供司机端开始服务前核对乘客身份。
 
 - 高德定位插件启动时从应用清单读取 `com.amap.api.v2.apikey` 并显式设置定位 SDK，避免 Android 初始化时序导致 Key 未生效。
-

@@ -13,6 +13,7 @@ import org.mannerth.starxcar.order.infrastructure.OrderFareItemMapper;
 import org.mannerth.starxcar.order.infrastructure.RideOrderEventMapper;
 import org.mannerth.starxcar.order.infrastructure.RideOrderMapper;
 import org.mannerth.starxcar.order.pricing.application.PricingRuleService;
+import org.mannerth.starxcar.order.payment.application.OrderSettlementService;
 import org.mannerth.starxcar.order.pricing.domain.FareCalculation;
 import org.mannerth.starxcar.order.pricing.domain.FareCalculator;
 import org.mannerth.starxcar.order.pricing.domain.FareLine;
@@ -26,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -47,12 +49,15 @@ public class OrderCompletionServiceImpl implements OrderCompletionService {
     private final OrderAccessService orderAccessService;
     private final PricingRuleService pricingRuleService;
     private final FareCalculator fareCalculator;
+    private final OrderSettlementService settlementService;
     private final Clock clock;
 
+    @Autowired
     public OrderCompletionServiceImpl(RideOrderMapper orderMapper, OrderFareItemMapper fareItemMapper,
                                       RideOrderEventMapper eventMapper, DriverMapper driverMapper,
                                       DriverLocationMapper locationMapper, OrderAccessService orderAccessService,
-                                      PricingRuleService pricingRuleService, FareCalculator fareCalculator, Clock clock) {
+                                      PricingRuleService pricingRuleService, FareCalculator fareCalculator,
+                                      OrderSettlementService settlementService, Clock clock) {
         this.orderMapper = orderMapper;
         this.fareItemMapper = fareItemMapper;
         this.eventMapper = eventMapper;
@@ -61,7 +66,17 @@ public class OrderCompletionServiceImpl implements OrderCompletionService {
         this.orderAccessService = orderAccessService;
         this.pricingRuleService = pricingRuleService;
         this.fareCalculator = fareCalculator;
+        this.settlementService = settlementService;
         this.clock = clock;
+    }
+
+    /** Compatibility constructor for legacy unit tests; Spring always uses the full constructor. */
+    public OrderCompletionServiceImpl(RideOrderMapper orderMapper, OrderFareItemMapper fareItemMapper,
+                                      RideOrderEventMapper eventMapper, DriverMapper driverMapper,
+                                      DriverLocationMapper locationMapper, OrderAccessService orderAccessService,
+                                      PricingRuleService pricingRuleService, FareCalculator fareCalculator, Clock clock) {
+        this(orderMapper, fareItemMapper, eventMapper, driverMapper, locationMapper, orderAccessService,
+                pricingRuleService, fareCalculator, null, clock);
     }
 
     @Override
@@ -94,6 +109,9 @@ public class OrderCompletionServiceImpl implements OrderCompletionService {
         List<OrderFareItem> items = calculation.lines().stream().map(line -> toFareItem(order, line, completedTime)).toList();
         if (fareItemMapper.insertBatch(items) != items.size()) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "写入计费明细失败");
+        }
+        if (settlementService != null) {
+            settlementService.settle(order, calculation.totalFare(), completedTime);
         }
         writeCompleteEvent(order.getId(), driverId, completedTime);
         if (driverMapper.markOnlineIfBusy(driverId) != 1) {

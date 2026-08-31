@@ -24,6 +24,7 @@ public record PricingRuleWriteRequest(
         @NotNull @DecimalMin("0.00") @Digits(integer = 8, fraction = 2) @Schema(description = "起步价，元", example = "5.00") BigDecimal baseFare,
         @NotNull @Min(0) @Max(4_294_967_295L) @Schema(description = "起步价包含距离，单位米", example = "2000") Long includedDistanceM,
         @NotNull @DecimalMin("0.00") @Digits(integer = 8, fraction = 2) @Schema(description = "最低消费，元", example = "5.00") BigDecimal minimumFare,
+        @NotNull @DecimalMin("0.00") @Digits(integer = 8, fraction = 2) @Schema(description = "司机到达后乘客取消费，元", example = "5.00") BigDecimal arrivalCancelFee,
         @NotEmpty @Valid @Schema(description = "完整收费分段集合") List<PricingTierWriteRequest> tiers
 ) {
     public PricingRuleWriteRequest {

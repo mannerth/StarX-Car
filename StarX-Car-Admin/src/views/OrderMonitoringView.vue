@@ -10,7 +10,7 @@ const keyword = ref(''); const orderType = ref<OrderType | ''>(''); const status
 const page = ref(1); const size = 20; const total = ref(0); const records = ref<AdminOrderSummary[]>([]); const metrics = ref<AdminOrderMetrics | null>(null)
 const loading = ref(false); const error = ref(''); const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size)))
 let timer: number | undefined
-const labels: Record<OrderStatus, string> = { SCHEDULED: '等待派单', PENDING: '待抢单', ACCEPTED: '已接单', DRIVER_ARRIVED: '司机已到达', IN_SERVICE: '服务中', COMPLETED: '已完成', CANCELLED: '已取消' }
+const labels: Record<OrderStatus, string> = { SCHEDULED: '等待派单', PENDING: '待抢单', ACCEPTED: '已接单', DRIVER_ARRIVED: '司机已到达', IN_SERVICE: '服务中', COMPLETED: '已完成', TERMINATED: '中途结束', CANCELLED: '已取消' }
 function format(value: string | null) { return value ? value.replace('T', ' ') : '—' }
 function money(value: number) { return `¥${Number(value).toFixed(2)}` }
 async function load() { loading.value = true; error.value = ''; try { const [orders, summary] = await Promise.all([fetchOrders({ page: page.value, size, keyword: keyword.value.trim() || undefined, orderType: orderType.value || undefined, status: status.value || undefined }), fetchOrderMetrics()]); records.value = orders.records; total.value = orders.total; page.value = orders.page; metrics.value = summary } catch (reason) { error.value = reason instanceof Error ? reason.message : '加载订单失败。' } finally { loading.value = false } }

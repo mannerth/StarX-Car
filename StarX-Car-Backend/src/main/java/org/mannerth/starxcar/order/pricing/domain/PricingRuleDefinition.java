@@ -19,6 +19,7 @@ public record PricingRuleDefinition(
         BigDecimal baseFare,
         long includedDistanceM,
         BigDecimal minimumFare,
+        BigDecimal arrivalCancelFee,
         List<PricingTierDefinition> tiers
 ) {
     public PricingRuleDefinition {

@@ -21,6 +21,7 @@ public record PricingRuleResponse(
         BigDecimal baseFare,
         Long includedDistanceM,
         BigDecimal minimumFare,
+        BigDecimal arrivalCancelFee,
         Long createdBy,
         Long updatedBy,
         LocalDateTime createdTime,

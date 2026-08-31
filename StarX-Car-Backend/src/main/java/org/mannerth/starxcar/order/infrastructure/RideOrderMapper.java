@@ -17,6 +17,9 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface RideOrderMapper extends BaseMapper<RideOrder> {
 
+    @Update("UPDATE ride_order SET payment_status = #{paymentStatus}, version = version + 1 WHERE id = #{orderId}")
+    int updatePaymentStatus(@Param("orderId") Long orderId, @Param("paymentStatus") String paymentStatus);
+
     @Update("""
             UPDATE ride_order
             SET driver_id = #{driverId}, car_id = #{carId}, status = 'ACCEPTED',
@@ -47,6 +50,17 @@ public interface RideOrderMapper extends BaseMapper<RideOrder> {
 
     @Update("""
             UPDATE ride_order
+            SET status = 'CANCELLED', payment_status = 'PAID', cancelled_time = #{cancelledTime}, cancelled_by = #{cancelledBy},
+                cancel_reason = #{cancelReason}, base_fare = #{fee}, total_fare = #{fee}, version = version + 1
+            WHERE id = #{orderId} AND status = 'DRIVER_ARRIVED' AND version = #{version}
+            """)
+    int cancelArrivedOrderWithFee(@Param("orderId") Long orderId, @Param("version") Long version,
+                                  @Param("cancelledTime") LocalDateTime cancelledTime,
+                                  @Param("cancelledBy") String cancelledBy, @Param("cancelReason") String cancelReason,
+                                  @Param("fee") BigDecimal fee);
+
+    @Update("""
+            UPDATE ride_order
             SET status = 'DRIVER_ARRIVED', driver_arrived_time = #{arrivedTime}, version = version + 1
             WHERE id = #{orderId} AND status = 'ACCEPTED' AND driver_id = #{driverId} AND version = #{version}
             """)
@@ -65,7 +79,7 @@ public interface RideOrderMapper extends BaseMapper<RideOrder> {
 
     @Update("""
             UPDATE ride_order
-            SET status = 'COMPLETED', completed_time = #{completedTime}, actual_duration_s = #{actualDurationS},
+            SET status = 'COMPLETED', payment_status = 'PAID', completed_time = #{completedTime}, actual_duration_s = #{actualDurationS},
                 base_fare = #{baseFare}, distance_fare = #{distanceFare}, driving_time_fare = #{drivingTimeFare},
                 waiting_fare = #{waitingFare}, total_fare = #{totalFare}, version = version + 1
             WHERE id = #{orderId} AND status = 'IN_SERVICE' AND driver_id = #{driverId} AND version = #{version}
@@ -76,4 +90,17 @@ public interface RideOrderMapper extends BaseMapper<RideOrder> {
                       @Param("distanceFare") BigDecimal distanceFare,
                       @Param("drivingTimeFare") BigDecimal drivingTimeFare,
                       @Param("waitingFare") BigDecimal waitingFare, @Param("totalFare") BigDecimal totalFare);
+
+    @Update("""
+            UPDATE ride_order
+            SET status = 'TERMINATED', payment_status = 'PAID', completed_time = #{endedTime}, actual_duration_s = #{actualDurationS},
+                base_fare = #{baseFare}, distance_fare = #{distanceFare}, driving_time_fare = #{drivingTimeFare},
+                waiting_fare = #{waitingFare}, total_fare = #{totalFare}, version = version + 1
+            WHERE id = #{orderId} AND status = 'IN_SERVICE' AND driver_id = #{driverId} AND version = #{version}
+            """)
+    int terminateOrder(@Param("orderId") Long orderId, @Param("driverId") Long driverId, @Param("version") Long version,
+                       @Param("endedTime") LocalDateTime endedTime, @Param("actualDurationS") Long actualDurationS,
+                       @Param("baseFare") BigDecimal baseFare, @Param("distanceFare") BigDecimal distanceFare,
+                       @Param("drivingTimeFare") BigDecimal drivingTimeFare, @Param("waitingFare") BigDecimal waitingFare,
+                       @Param("totalFare") BigDecimal totalFare);
 }

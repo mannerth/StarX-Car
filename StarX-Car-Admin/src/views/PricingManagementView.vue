@@ -25,7 +25,7 @@ const saving = ref(false)
 const error = ref('')
 const expandedId = ref<number | null>(null)
 const editing = ref<PricingRule | 'new' | null>(null)
-const form = ref({ name: '', baseFare: 5, includedDistanceM: 2000, minimumFare: 5, tiers: [] as TierForm[] })
+const form = ref({ name: '', baseFare: 5, includedDistanceM: 2000, minimumFare: 5, arrivalCancelFee: 5, tiers: [] as TierForm[] })
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size)))
 
 const statusLabel: Record<PricingRuleStatus, string> = { draft: '草稿', active: '已生效', inactive: '已停用', archived: '已归档' }
@@ -58,11 +58,11 @@ async function load() {
 
 function openCreate() {
   editing.value = 'new'
-  form.value = { name: '默认即时叫车规则', baseFare: 5, includedDistanceM: 2000, minimumFare: 5, tiers: initialTiers() }
+  form.value = { name: '默认即时叫车规则', baseFare: 5, includedDistanceM: 2000, minimumFare: 5, arrivalCancelFee: 5, tiers: initialTiers() }
 }
 function openEdit(rule: PricingRule) {
   editing.value = rule
-  form.value = { name: rule.name, baseFare: Number(rule.baseFare), includedDistanceM: rule.includedDistanceM, minimumFare: Number(rule.minimumFare), tiers: rule.tiers.map((tier) => ({ chargeType: tier.chargeType, rangeStart: tier.rangeStart, rangeEnd: tier.rangeEnd, unitSize: tier.unitSize, unitPrice: Number(tier.unitPrice) })) }
+  form.value = { name: rule.name, baseFare: Number(rule.baseFare), includedDistanceM: rule.includedDistanceM, minimumFare: Number(rule.minimumFare), arrivalCancelFee: Number(rule.arrivalCancelFee), tiers: rule.tiers.map((tier) => ({ chargeType: tier.chargeType, rangeStart: tier.rangeStart, rangeEnd: tier.rangeEnd, unitSize: tier.unitSize, unitPrice: Number(tier.unitPrice) })) }
 }
 function closeModal() { editing.value = null }
 function tiersFor(type: FareChargeType) { return form.value.tiers.filter((tier) => tier.chargeType === type) }
@@ -81,7 +81,7 @@ function payload(): PricingRuleWriteRequest {
     const rangeEnd = String(tier.rangeEnd ?? '').trim()
     return { chargeType: tier.chargeType, rangeStart: Number(tier.rangeStart), rangeEnd: rangeEnd ? Number(rangeEnd) : null, unitSize: Number(tier.unitSize), unitPrice: Number(tier.unitPrice), roundingMode: 'CEIL' as const, sortNo: (index + 1) * 10 }
   }))
-  return { name: form.value.name.trim(), baseFare: Number(form.value.baseFare), includedDistanceM: Number(form.value.includedDistanceM), minimumFare: Number(form.value.minimumFare), tiers }
+  return { name: form.value.name.trim(), baseFare: Number(form.value.baseFare), includedDistanceM: Number(form.value.includedDistanceM), minimumFare: Number(form.value.minimumFare), arrivalCancelFee: Number(form.value.arrivalCancelFee), tiers }
 }
 async function save() {
   if (!editing.value) return
@@ -124,7 +124,7 @@ onMounted(() => void load())
         <div class="rule-list">
           <div v-if="loading" class="empty">正在加载...</div><div v-else-if="!rules.length" class="empty">暂无计费规则</div>
           <article v-for="rule in rules" :key="rule.id" class="rule-row">
-            <button class="rule-summary" @click="expandedId = expandedId === rule.id ? null : rule.id"><span><strong>{{ rule.name }} <em>v{{ rule.version }}</em></strong><small>起步 {{ rule.baseFare }} 元 / 含 {{ rule.includedDistanceM }} 米 · 最低消费 {{ rule.minimumFare }} 元</small></span><span class="rule-meta"><span v-if="rule.defaultRule" class="status default">当前默认</span><span class="status" :class="rule.status">{{ statusLabel[rule.status] }}</span><b>{{ expandedId === rule.id ? '收起' : '明细' }}</b></span></button>
+            <button class="rule-summary" @click="expandedId = expandedId === rule.id ? null : rule.id"><span><strong>{{ rule.name }} <em>v{{ rule.version }}</em></strong><small>起步 {{ rule.baseFare }} 元 / 含 {{ rule.includedDistanceM }} 米 · 最低消费 {{ rule.minimumFare }} 元 · 到达后取消 {{ rule.arrivalCancelFee }} 元</small></span><span class="rule-meta"><span v-if="rule.defaultRule" class="status default">当前默认</span><span class="status" :class="rule.status">{{ statusLabel[rule.status] }}</span><b>{{ expandedId === rule.id ? '收起' : '明细' }}</b></span></button>
             <div v-if="expandedId === rule.id" class="rule-detail"><div v-for="type in chargeTypes" :key="type" class="tier-group"><h3>{{ typeLabel[type] }}</h3><div v-for="tier in rule.tiers.filter(item => item.chargeType === type)" :key="tier.id" class="tier-line"><span>{{ tier.rangeStart }} - {{ tier.rangeEnd ?? '不限' }} {{ unitLabel(type) }}</span><strong>{{ tier.unitPrice }} 元 / {{ tier.unitSize }} {{ unitLabel(type) }}</strong><span>不足单位向上取整</span></div></div><div class="rule-actions"><button v-if="rule.status === 'draft'" class="secondary" @click="openEdit(rule)">编辑草稿</button><button v-if="rule.status === 'draft'" class="secondary" @click="activate(rule, false)">仅激活</button><button v-if="rule.status === 'draft'" @click="activate(rule, true)">激活并设为默认</button><button v-if="!rule.defaultRule && rule.status !== 'archived'" class="danger-button" @click="archive(rule)">归档</button></div></div>
           </article>
         </div>
@@ -132,7 +132,7 @@ onMounted(() => void load())
       </section>
     </main>
 
-    <div v-if="editing" class="modal-backdrop" @click.self="closeModal"><form class="modal pricing-modal" @submit.prevent="save"><div class="modal-title"><div><h2>{{ editing === 'new' ? '新建计费规则' : '编辑计费规则' }}</h2><p>区间必须连续，每类最后一段的终点留空表示不限。</p></div><button type="button" class="close" @click="closeModal">×</button></div><div class="pricing-basics"><label>规则名称<input v-model="form.name" required maxlength="50" :disabled="editing !== 'new'" /></label><label>起步价（元）<input v-model.number="form.baseFare" required type="number" min="0" step="0.01" /></label><label>包含距离（米）<input v-model.number="form.includedDistanceM" required type="number" min="0" step="1" /></label><label>最低消费（元）<input v-model.number="form.minimumFare" required type="number" min="0" step="0.01" /></label></div>
+    <div v-if="editing" class="modal-backdrop" @click.self="closeModal"><form class="modal pricing-modal" @submit.prevent="save"><div class="modal-title"><div><h2>{{ editing === 'new' ? '新建计费规则' : '编辑计费规则' }}</h2><p>区间必须连续，每类最后一段的终点留空表示不限。</p></div><button type="button" class="close" @click="closeModal">×</button></div><div class="pricing-basics"><label>规则名称<input v-model="form.name" required maxlength="50" :disabled="editing !== 'new'" /></label><label>起步价（元）<input v-model.number="form.baseFare" required type="number" min="0" step="0.01" /></label><label>包含距离（米）<input v-model.number="form.includedDistanceM" required type="number" min="0" step="1" /></label><label>最低消费（元）<input v-model.number="form.minimumFare" required type="number" min="0" step="0.01" /></label><label>到达取消费（元）<input v-model.number="form.arrivalCancelFee" required type="number" min="0" step="0.01" /></label></div>
       <section v-for="type in chargeTypes" :key="type" class="tier-editor"><div class="tier-heading"><h3>{{ typeLabel[type] }}分段</h3><button type="button" class="secondary" @click="addTier(type)">添加分段</button></div><div class="tier-grid tier-labels"><span>起点（{{ unitLabel(type) }}）</span><span>终点（留空不限）</span><span>计费单位</span><span>单位价格（元）</span><span></span></div><div v-for="tier in tiersFor(type)" :key="form.tiers.indexOf(tier)" class="tier-grid"><input v-model.number="tier.rangeStart" required type="number" min="0" step="1" /><input v-model.number="tier.rangeEnd" type="number" min="0" step="1" /><input v-model.number="tier.unitSize" required type="number" min="1" step="1" /><input v-model.number="tier.unitPrice" required type="number" min="0" step="0.01" /><button type="button" class="icon-delete" title="删除分段" @click="removeTier(tier)">×</button></div></section>
       <div class="modal-actions"><button type="button" class="secondary" @click="closeModal">取消</button><button :disabled="saving">{{ saving ? '保存中...' : '保存草稿' }}</button></div></form></div>
   </div>

@@ -6,7 +6,9 @@ import org.mannerth.starxcar.constant.UserType;
 import org.mannerth.starxcar.order.application.OrderLifecycleService;
 import org.mannerth.starxcar.order.request.OrderCancelRequest;
 import org.mannerth.starxcar.order.request.StartServiceRequest;
+import org.mannerth.starxcar.order.request.OrderTerminateRequest;
 import org.mannerth.starxcar.order.response.OrderStatusTransitionResponse;
+import org.mannerth.starxcar.order.response.OrderTerminationResponse;
 import org.mannerth.starxcar.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -42,7 +44,7 @@ public class OrderLifecycleController {
 
     @PostMapping("/api/orders/{orderNo}/cancel")
     @PreAuthorize("hasAnyRole('PASSENGER', 'DRIVER')")
-    @Operation(summary = "取消订单", description = "仅限订单乘客或已接单司机。乘客只能取消 PENDING 或 ACCEPTED，司机只能取消自己已接的 ACCEPTED；到达、服务中和终态订单均不可取消。已接订单取消后释放司机和位置关联。")
+    @Operation(summary = "取消订单", description = "仅限订单乘客或已接单司机。司机到达前乘客取消免费；司机到达后乘客取消按订单历史规则收取固定取消费并计入司机余额；司机仅能取消自己已接的 ACCEPTED。")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "取消成功"), @ApiResponse(responseCode = "400", description = "取消原因格式无效"), @ApiResponse(responseCode = "401", description = "未登录"), @ApiResponse(responseCode = "403", description = "非乘客/司机角色或账号不可用"), @ApiResponse(responseCode = "404", description = "订单不存在或不属于当前用户"), @ApiResponse(responseCode = "409", description = "订单状态或司机工作状态已变化，当前不可取消")})
     public OrderStatusTransitionResponse cancelOrder(@AuthenticationPrincipal String principal, @PathVariable String orderNo,
                                                       @Valid @RequestBody(required = false) OrderCancelRequest request) {
@@ -76,6 +78,21 @@ public class OrderLifecycleController {
         Long userId = CurrentUser.id(principal);
         requireDriver(userId);
         return lifecycleService.startService(userId, orderNo, request == null ? null : request.phoneTail());
+    }
+
+    @PostMapping("/api/orders/{orderNo}/terminate")
+    @PreAuthorize("hasAnyRole('PASSENGER', 'DRIVER')")
+    @Operation(summary = "服务中结束订单", description = "仅限订单乘客或已接单司机在 IN_SERVICE 单方发起。服务端要求司机最新位置未过期，使用订单历史计价规则、实际上车点至司机最新位置的路线距离、服务时长和等待时长结算；成功后扣除乘客余额、计入司机余额并释放司机。")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "中途结束并结算成功"), @ApiResponse(responseCode = "400", description = "结束原因无效"), @ApiResponse(responseCode = "401", description = "未登录"), @ApiResponse(responseCode = "403", description = "非订单参与者或账号不可用"), @ApiResponse(responseCode = "404", description = "订单不存在或不属于当前用户"), @ApiResponse(responseCode = "409", description = "订单状态、司机位置或司机工作状态不满足结束条件"), @ApiResponse(responseCode = "503", description = "计价规则或路线服务不可用")})
+    public OrderTerminationResponse terminate(@AuthenticationPrincipal String principal, @PathVariable String orderNo,
+                                              @Valid @RequestBody OrderTerminateRequest request) {
+        Long userId = CurrentUser.id(principal);
+        User user = requireActiveUser(userId);
+        return switch (user.getType()) {
+            case passenger -> lifecycleService.terminateByPassenger(userId, orderNo, request.reasonCode(), request.reasonDetail());
+            case driver -> lifecycleService.terminateByDriver(userId, orderNo, request.reasonCode(), request.reasonDetail());
+            case admin -> throw new ResponseStatusException(HttpStatus.FORBIDDEN, "管理员不能结束行程");
+        };
     }
 
     private User requireActiveUser(Long userId) {

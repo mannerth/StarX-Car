@@ -20,6 +20,11 @@ class PassengerRepository {
     await _apiClient.delete('/passengers/me');
   }
 
+  Future<WalletBalance> walletBalance() => WalletApi(_apiClient).balance();
+
+  Future<WalletBalance> recharge(double amount) =>
+      WalletApi(_apiClient).recharge(amount);
+
   Future<UserProfile> updateProfile({
     required String username,
     required String email,

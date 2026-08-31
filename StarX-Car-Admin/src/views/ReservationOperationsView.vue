@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import type { AdminOrderSummary, OrderStatus } from '@/types/api'
 
 const auth = useAuthStore(); const router = useRouter(); const page = ref(1); const size = 20; const total = ref(0); const records = ref<AdminOrderSummary[]>([]); const loading = ref(false); const error = ref(''); const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size))); let timer: number | undefined
-const labels: Record<OrderStatus, string> = { SCHEDULED: '等待派单', PENDING: '待抢单', ACCEPTED: '已接单', DRIVER_ARRIVED: '司机已到达', IN_SERVICE: '服务中', COMPLETED: '已完成', CANCELLED: '已取消' }
+const labels: Record<OrderStatus, string> = { SCHEDULED: '等待派单', PENDING: '待抢单', ACCEPTED: '已接单', DRIVER_ARRIVED: '司机已到达', IN_SERVICE: '服务中', COMPLETED: '已完成', TERMINATED: '中途结束', CANCELLED: '已取消' }
 function format(value: string | null) { return value ? value.replace('T', ' ') : '—' }
 function countdown(value: string | null) { if (!value) return '—'; const seconds = Math.round((new Date(value.replace(' ', 'T')).getTime() - Date.now()) / 1000); if (seconds <= 0) return '已到预约时间'; const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60); return `${h ? `${h}小时` : ''}${m}分钟后` }
 async function load() { loading.value = true; error.value = ''; try { const result = await fetchOrders({ page: page.value, size, orderType: 'SCHEDULED' }); records.value = result.records; total.value = result.total; page.value = result.page } catch (reason) { error.value = reason instanceof Error ? reason.message : '加载预约订单失败。' } finally { loading.value = false } }

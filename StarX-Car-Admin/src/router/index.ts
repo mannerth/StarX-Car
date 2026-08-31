@@ -8,6 +8,7 @@ import PricingManagementView from '@/views/PricingManagementView.vue'
 import OrderMonitoringView from '@/views/OrderMonitoringView.vue'
 import ReservationOperationsView from '@/views/ReservationOperationsView.vue'
 import OrderDetailView from '@/views/OrderDetailView.vue'
+import ComplaintOperationsView from '@/views/ComplaintOperationsView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -19,6 +20,7 @@ const router = createRouter({
     { path: '/pricing', name: 'pricing', component: PricingManagementView },
     { path: '/orders', name: 'orders', component: OrderMonitoringView },
     { path: '/reservations', name: 'reservations', component: ReservationOperationsView },
+    { path: '/complaints', name: 'complaints', component: ComplaintOperationsView },
     { path: '/orders/:orderNo', name: 'order-detail', component: OrderDetailView },
     { path: '/profile', name: 'profile', component: ProfileView },
   ],

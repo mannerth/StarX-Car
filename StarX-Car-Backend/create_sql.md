@@ -176,6 +176,7 @@ CREATE TABLE pricing_rule
     base_fare           DECIMAL(10, 2) NOT NULL COMMENT '起步价',
     included_distance_m INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT '起步价包含距离，单位米',
     minimum_fare        DECIMAL(10, 2) NOT NULL DEFAULT 0 COMMENT '最低消费',
+    arrival_cancel_fee  DECIMAL(10, 2) NOT NULL DEFAULT 5.00 COMMENT '司机到达后乘客取消时收取的固定费用',
     created_by          INT            NULL COMMENT '创建管理员 user.id',
     updated_by          INT            NULL COMMENT '最后修改管理员 user.id',
     created_time        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -216,9 +217,9 @@ CREATE TABLE ride_order
     car_id               INT            NULL COMMENT '抢单成功时写入 driver.car_id 快照',
     pricing_rule_id      INT            NOT NULL COMMENT '下单时采用的规则',
     pricing_rule_version INT            NOT NULL COMMENT '下单时规则版本快照',
-    status               VARCHAR(30)    NOT NULL COMMENT 'PENDING、ACCEPTED、DRIVER_ARRIVED、IN_SERVICE、COMPLETED、CANCELLED',
+    status               VARCHAR(30)    NOT NULL COMMENT 'SCHEDULED、PENDING、ACCEPTED、DRIVER_ARRIVED、IN_SERVICE、COMPLETED、TERMINATED、CANCELLED',
     version              INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT '乐观锁版本，防止多人同时抢单',
-    payment_status       VARCHAR(20)    NOT NULL DEFAULT 'unpaid' COMMENT '一期固定为 unpaid',
+    payment_status       VARCHAR(20)    NOT NULL DEFAULT 'UNPAID' COMMENT 'UNPAID、PAID、PARTIALLY_REFUNDED、REFUNDED',
 
     pickup_poi_id        VARCHAR(64)    NULL,
     pickup_name          VARCHAR(100)   NOT NULL,
@@ -272,7 +273,7 @@ CREATE TABLE ride_order_event
 (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_id      BIGINT       NOT NULL,
-    event_type    VARCHAR(30)  NOT NULL COMMENT 'CREATE、DISPATCH（预约单 SCHEDULED->PENDING）、ACCEPT、ARRIVE、START_SERVICE、COMPLETE、CANCEL',
+    event_type    VARCHAR(30)  NOT NULL COMMENT 'CREATE、DISPATCH、ACCEPT、ARRIVE、START_SERVICE、COMPLETE、TERMINATE、CANCEL',
     from_status   VARCHAR(30)  NULL,
     to_status     VARCHAR(30)  NOT NULL,
     operator_type VARCHAR(20)  NOT NULL COMMENT 'passenger、driver、system、admin',
@@ -287,7 +288,7 @@ CREATE TABLE order_fare_item
 (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_id      BIGINT         NOT NULL,
-    charge_type   VARCHAR(20)    NOT NULL COMMENT 'BASE、DISTANCE、DRIVING_TIME、WAITING_TIME',
+    charge_type   VARCHAR(20)    NOT NULL COMMENT 'BASE、DISTANCE、DRIVING_TIME、WAITING_TIME、ARRIVAL_CANCEL',
     rule_id       INT            NOT NULL,
     rule_version  INT            NOT NULL,
     tier_id       INT            NULL COMMENT 'BASE 项为空',
@@ -303,6 +304,143 @@ CREATE TABLE order_fare_item
     CONSTRAINT fk_order_fare_item_rule FOREIGN KEY (rule_id) REFERENCES pricing_rule (id),
     CONSTRAINT fk_order_fare_item_tier FOREIGN KEY (tier_id) REFERENCES pricing_rule_tier (id),
     KEY idx_order_fare_item_order (order_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- 每名用户一条余额账户；账户按首次充值、结算或退款时懒创建。
+-- balance 可为负数，以支持乘客透支扣款及投诉退款对司机收入的回冲。
+CREATE TABLE user_balance_account
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT            NOT NULL,
+    balance      DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    version      INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT '余额原子更新的乐观锁版本',
+    created_time DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_time DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user_balance_account_user FOREIGN KEY (user_id) REFERENCES `user` (id),
+    CONSTRAINT uk_user_balance_account_user UNIQUE (user_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- 不可修改的余额账本。amount 为有符号金额，正数代表入账，负数代表出账。
+CREATE TABLE balance_transaction
+(
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    transaction_no  VARCHAR(40)    NOT NULL COMMENT '对外流水号',
+    user_id         INT            NOT NULL,
+    order_id        BIGINT         NULL,
+    complaint_id    BIGINT         NULL COMMENT '投诉表创建后补充外键',
+    transaction_type VARCHAR(30)   NOT NULL COMMENT 'RECHARGE、ORDER_PAYMENT、DRIVER_INCOME、REFUND、WITHDRAWAL',
+    amount          DECIMAL(12, 2) NOT NULL COMMENT '有符号变动金额',
+    balance_before  DECIMAL(12, 2) NOT NULL,
+    balance_after   DECIMAL(12, 2) NOT NULL,
+    idempotency_key VARCHAR(80)    NOT NULL COMMENT '单个账户变动的幂等键',
+    description     VARCHAR(255)   NULL,
+    created_time    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_balance_transaction_user FOREIGN KEY (user_id) REFERENCES `user` (id),
+    CONSTRAINT fk_balance_transaction_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    CONSTRAINT uk_balance_transaction_no UNIQUE (transaction_no),
+    CONSTRAINT uk_balance_transaction_idempotency UNIQUE (idempotency_key),
+    KEY idx_balance_transaction_user_created (user_id, created_time, id),
+    KEY idx_balance_transaction_order_created (order_id, created_time, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- 每个发生收费的订单一条支付结算事实；退款累计额由服务端原子校验，不得超过 paid_amount。
+CREATE TABLE order_payment
+(
+    id                    BIGINT AUTO_INCREMENT PRIMARY KEY,
+    payment_no            VARCHAR(40)    NOT NULL,
+    order_id              BIGINT         NOT NULL,
+    payer_user_id         INT            NOT NULL,
+    payee_user_id         INT            NOT NULL COMMENT '收入所属司机 user.id',
+    amount_due            DECIMAL(12, 2) NOT NULL COMMENT '订单应收金额',
+    paid_amount           DECIMAL(12, 2) NOT NULL COMMENT '已从乘客余额扣除的金额',
+    refunded_amount       DECIMAL(12, 2) NOT NULL DEFAULT 0.00 COMMENT '累计已退款金额',
+    driver_income_amount  DECIMAL(12, 2) NOT NULL COMMENT '已计入司机余额的收入',
+    status                VARCHAR(30)    NOT NULL COMMENT 'PAID、PARTIALLY_REFUNDED、REFUNDED',
+    paid_time             DATETIME       NOT NULL,
+    completed_time        DATETIME       NULL COMMENT '全部退款完成时间；非全额退款为空',
+    version               INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT '退款累计额原子更新版本',
+    created_time          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_time          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_order_payment_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    CONSTRAINT fk_order_payment_payer FOREIGN KEY (payer_user_id) REFERENCES `user` (id),
+    CONSTRAINT fk_order_payment_payee FOREIGN KEY (payee_user_id) REFERENCES `user` (id),
+    CONSTRAINT uk_order_payment_no UNIQUE (payment_no),
+    CONSTRAINT uk_order_payment_order UNIQUE (order_id),
+    KEY idx_order_payment_payer_time (payer_user_id, paid_time, id),
+    KEY idx_order_payment_payee_time (payee_user_id, paid_time, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- 一单至多一条异常结束事实，覆盖司机到达后的乘客取消和服务中的单方中途结束。
+CREATE TABLE order_cancellation
+(
+    id                 BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id           BIGINT         NOT NULL,
+    terminal_status    VARCHAR(30)    NOT NULL COMMENT 'CANCELLED 或 TERMINATED',
+    initiator_type     VARCHAR(20)    NOT NULL COMMENT 'passenger、driver、system、admin',
+    cancellation_stage VARCHAR(30)    NOT NULL COMMENT 'SCHEDULED、PENDING、ACCEPTED、DRIVER_ARRIVED、IN_SERVICE',
+    reason_code        VARCHAR(40)    NOT NULL,
+    reason_detail      VARCHAR(500)   NULL,
+    charged_amount     DECIMAL(12, 2) NOT NULL DEFAULT 0.00 COMMENT '本次异常结束向乘客收取的金额',
+    actual_end_lat     DECIMAL(10, 6) NULL COMMENT '中途结束时司机最后有效 GCJ-02 纬度',
+    actual_end_lng     DECIMAL(10, 6) NULL COMMENT '中途结束时司机最后有效 GCJ-02 经度',
+    ended_time         DATETIME       NOT NULL,
+    created_time       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_order_cancellation_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    CONSTRAINT uk_order_cancellation_order UNIQUE (order_id),
+    KEY idx_order_cancellation_initiator_time (initiator_type, ended_time, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE complaint
+(
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    complaint_no        VARCHAR(40)    NOT NULL,
+    order_id            BIGINT         NOT NULL,
+    complainant_user_id INT            NOT NULL,
+    complaint_type      VARCHAR(40)    NOT NULL COMMENT 'SERVICE_ATTITUDE、ROUTE_OR_FARE、SAFETY、NO_SHOW、LOST_ITEM、OTHER',
+    content             VARCHAR(1000)  NOT NULL,
+    status              VARCHAR(30)    NOT NULL DEFAULT 'OPEN' COMMENT 'OPEN、PROCESSING、RESOLVED、REJECTED、WITHDRAWN',
+    resolution_type     VARCHAR(30)    NULL COMMENT 'APOLOGY、PARTIAL_REFUND、FULL_REFUND、REJECT',
+    refund_amount       DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    resolved_by         INT            NULL COMMENT '处理管理员 user.id',
+    resolved_time       DATETIME       NULL,
+    created_time        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_time        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_complaint_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
+    CONSTRAINT fk_complaint_complainant FOREIGN KEY (complainant_user_id) REFERENCES `user` (id),
+    CONSTRAINT fk_complaint_resolver FOREIGN KEY (resolved_by) REFERENCES `user` (id),
+    CONSTRAINT uk_complaint_no UNIQUE (complaint_no),
+    KEY idx_complaint_status_created (status, created_time, id),
+    KEY idx_complaint_order_created (order_id, created_time, id),
+    KEY idx_complaint_complainant_created (complainant_user_id, created_time, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+ALTER TABLE balance_transaction
+    ADD CONSTRAINT fk_balance_transaction_complaint FOREIGN KEY (complaint_id) REFERENCES complaint (id);
+
+CREATE TABLE complaint_evidence
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    complaint_id BIGINT       NOT NULL,
+    image_url    VARCHAR(500) NOT NULL,
+    sort_no      INT UNSIGNED NOT NULL DEFAULT 0,
+    created_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_complaint_evidence_complaint FOREIGN KEY (complaint_id) REFERENCES complaint (id),
+    CONSTRAINT uk_complaint_evidence_sort UNIQUE (complaint_id, sort_no)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- 管理员处理过程只追加；最终结论写入 complaint 便于待办筛选。
+CREATE TABLE complaint_handle_log
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    complaint_id BIGINT         NOT NULL,
+    admin_id     INT            NOT NULL,
+    action       VARCHAR(30)    NOT NULL COMMENT 'PROCESS、APOLOGY、PARTIAL_REFUND、FULL_REFUND、REJECT',
+    content      VARCHAR(1000)  NOT NULL,
+    refund_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    created_time DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_complaint_handle_log_complaint FOREIGN KEY (complaint_id) REFERENCES complaint (id),
+    CONSTRAINT fk_complaint_handle_log_admin FOREIGN KEY (admin_id) REFERENCES `user` (id),
+    KEY idx_complaint_handle_log_complaint_time (complaint_id, created_time, id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE driver_location
@@ -383,95 +521,13 @@ CREATE TABLE admin_operation_log
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 ```
 
-存量库升级（2026-08-13 评价系统；新建库已包含上述结构，无需执行）：
-
-```sql
-ALTER TABLE driver
-    ADD COLUMN rating_sum   DECIMAL(12, 2) NOT NULL DEFAULT 0 COMMENT '累计评分总和，用于精确重算平均分' AFTER rating,
-    ADD COLUMN rating_count INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT '累计评价次数' AFTER rating_sum;
-
-CREATE TABLE order_rating
-(
-    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
-    order_id     BIGINT          NOT NULL COMMENT '被评价订单；一个订单仅一条乘客评价',
-    passenger_id INT             NOT NULL COMMENT '评价乘客 user.id，与 ride_order.passenger_id 一致',
-    driver_id    INT             NOT NULL COMMENT '被评价司机 user.id，与 ride_order.driver_id 一致',
-    rating       TINYINT UNSIGNED NOT NULL COMMENT '1-5 星整数评分，服务层校验范围',
-    content      VARCHAR(500)    NULL COMMENT '评价文字，可选',
-    created_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评价提交时间',
-    updated_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间（预留）',
-    CONSTRAINT fk_order_rating_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
-    CONSTRAINT fk_order_rating_passenger FOREIGN KEY (passenger_id) REFERENCES passenger (id),
-    CONSTRAINT fk_order_rating_driver FOREIGN KEY (driver_id) REFERENCES driver (id),
-    CONSTRAINT uk_order_rating_order UNIQUE (order_id),
-    KEY idx_order_rating_driver_created (driver_id, created_time),
-    KEY idx_order_rating_passenger_created (passenger_id, created_time)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
-```
-
-存量库升级（2026-08-30 预约单；新建库已包含上述结构，无需执行）：
-
-```sql
-ALTER TABLE ride_order
-    ADD COLUMN order_type           VARCHAR(20) NOT NULL DEFAULT 'INSTANT'
-        COMMENT '订单类型：INSTANT 即时单、SCHEDULED 预约单' AFTER order_no,
-    ADD COLUMN scheduled_pickup_time DATETIME NULL
-        COMMENT '预约上车时间；即时单为 NULL' AFTER destination_lng,
-    ADD COLUMN dispatch_time        DATETIME NULL
-        COMMENT '订单进入可抢单 PENDING 的时间；即时单等于创建时间' AFTER created_time;
-
-CREATE INDEX idx_ride_order_type_status_scheduled
-    ON ride_order (order_type, status, scheduled_pickup_time);
-```
-
-存量库升级（2026-08-31 管理端订单监控与预约运营；新建库已包含上述结构，无需执行）：
-
-```sql
-ALTER TABLE ride_order
-    ADD KEY idx_ride_order_admin_created (created_time, id),
-    ADD KEY idx_ride_order_admin_type_status_created (order_type, status, created_time, id),
-    ADD KEY idx_ride_order_status_completed_time (status, completed_time);
-
-CREATE TABLE order_operation_note
-(
-    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
-    order_id     BIGINT       NOT NULL,
-    admin_id     INT          NOT NULL,
-    content      VARCHAR(500) NOT NULL,
-    created_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_order_operation_note_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
-    CONSTRAINT fk_order_operation_note_admin FOREIGN KEY (admin_id) REFERENCES `user` (id),
-    KEY idx_order_operation_note_order_time (order_id, created_time, id)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
-
-CREATE TABLE admin_operation_log
-(
-    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
-    admin_id      INT          NOT NULL,
-    action        VARCHAR(40)  NOT NULL COMMENT 'ORDER_CANCEL、RESERVATION_DISPATCH、ORDER_NOTE_CREATE',
-    target_type   VARCHAR(30)  NOT NULL DEFAULT 'ORDER',
-    target_id     BIGINT       NOT NULL,
-    order_id      BIGINT       NULL,
-    before_status VARCHAR(30)  NULL,
-    after_status  VARCHAR(30)  NULL,
-    reason        VARCHAR(500) NULL,
-    trace_id      VARCHAR(64)  NULL,
-    created_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_admin_operation_log_admin FOREIGN KEY (admin_id) REFERENCES `user` (id),
-    CONSTRAINT fk_admin_operation_log_order FOREIGN KEY (order_id) REFERENCES ride_order (id),
-    KEY idx_admin_operation_log_order_time (order_id, created_time, id),
-    KEY idx_admin_operation_log_admin_time (admin_id, created_time, id),
-    KEY idx_admin_operation_log_target_time (target_type, target_id, created_time, id)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
-```
-
 默认即时叫车计价规则：
 
 ```sql
 INSERT INTO pricing_rule
-    (name, version, status, is_default, base_fare, included_distance_m, minimum_fare)
+    (name, version, status, is_default, base_fare, included_distance_m, minimum_fare, arrival_cancel_fee)
 VALUES
-    ('默认即时叫车规则', 1, 'active', 1, 5.00, 2000, 5.00);
+    ('默认即时叫车规则', 1, 'active', 1, 5.00, 2000, 5.00, 5.00);
 
 SET @default_pricing_rule_id = LAST_INSERT_ID();
 

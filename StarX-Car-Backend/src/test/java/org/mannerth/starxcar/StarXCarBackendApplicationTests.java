@@ -27,6 +27,12 @@ import org.mannerth.starxcar.order.domain.OrderStatus;
 import org.mannerth.starxcar.order.domain.OrderType;
 import org.mannerth.starxcar.order.infrastructure.DriverLocationMapper;
 import org.mannerth.starxcar.order.infrastructure.RideOrderMapper;
+import org.mannerth.starxcar.order.infrastructure.OrderCancellationMapper;
+import org.mannerth.starxcar.order.infrastructure.OrderFareItemMapper;
+import org.mannerth.starxcar.order.complaint.infrastructure.ComplaintMapper;
+import org.mannerth.starxcar.order.payment.infrastructure.BalanceTransactionMapper;
+import org.mannerth.starxcar.order.payment.infrastructure.OrderPaymentMapper;
+import org.mannerth.starxcar.order.payment.infrastructure.UserBalanceAccountMapper;
 import org.mannerth.starxcar.order.pricing.application.AdminPricingRuleService;
 import org.mannerth.starxcar.order.pricing.infrastructure.PricingRuleMapper;
 import org.mannerth.starxcar.order.pricing.infrastructure.PricingRuleTierMapper;
@@ -125,6 +131,24 @@ class StarXCarBackendApplicationTests {
 
     @MockitoBean
     private DriverLocationMapper driverLocationMapper;
+
+    @MockitoBean
+    private OrderFareItemMapper orderFareItemMapper;
+
+    @MockitoBean
+    private OrderCancellationMapper orderCancellationMapper;
+
+    @MockitoBean
+    private UserBalanceAccountMapper userBalanceAccountMapper;
+
+    @MockitoBean
+    private BalanceTransactionMapper balanceTransactionMapper;
+
+    @MockitoBean
+    private OrderPaymentMapper orderPaymentMapper;
+
+    @MockitoBean
+    private ComplaintMapper complaintMapper;
 
     @MockitoBean
     private DriverWorkService driverWorkService;

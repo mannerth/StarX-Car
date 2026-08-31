@@ -77,7 +77,7 @@ public class PricingRuleServiceImpl implements PricingRuleService {
                 .toList();
         PricingRuleDefinition definition = new PricingRuleDefinition(rule.getId(), rule.getName(), rule.getVersion(),
                 rule.getStatus(), Boolean.TRUE.equals(rule.getDefaultRule()), rule.getBaseFare(),
-                rule.getIncludedDistanceM(), rule.getMinimumFare(), tiers);
+                rule.getIncludedDistanceM(), rule.getMinimumFare(), rule.getArrivalCancelFee(), tiers);
         try {
             validator.validate(definition);
             return definition;

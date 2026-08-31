@@ -1,6 +1,7 @@
 package org.mannerth.starxcar.order.application;
 
 import org.mannerth.starxcar.order.response.OrderStatusTransitionResponse;
+import org.mannerth.starxcar.order.response.OrderTerminationResponse;
 
 
 
@@ -20,4 +21,8 @@ public interface OrderLifecycleService {
      * four-digit phone tail. A null or mismatching tail is rejected with 400.
      */
     OrderStatusTransitionResponse startService(Long driverId, String orderNo, String phoneTail);
+
+    OrderTerminationResponse terminateByPassenger(Long passengerId, String orderNo, String reasonCode, String reasonDetail);
+
+    OrderTerminationResponse terminateByDriver(Long driverId, String orderNo, String reasonCode, String reasonDetail);
 }

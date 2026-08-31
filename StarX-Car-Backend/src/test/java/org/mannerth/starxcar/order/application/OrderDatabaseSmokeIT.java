@@ -426,7 +426,7 @@ class OrderDatabaseSmokeIT {
     }
 
     private PricingRuleWriteRequest pricingRuleRequest(String name) {
-        return new PricingRuleWriteRequest(name, new BigDecimal("5.00"), 2000L, new BigDecimal("5.00"), List.of(
+        return new PricingRuleWriteRequest(name, new BigDecimal("5.00"), 2000L, new BigDecimal("5.00"), new BigDecimal("5.00"), List.of(
                 tier(FareChargeType.DISTANCE, 0, 2000L, 1000, "0.00", 10),
                 tier(FareChargeType.DISTANCE, 2000, 12000L, 1000, "3.00", 20),
                 tier(FareChargeType.DISTANCE, 12000, null, 1000, "1.20", 30),

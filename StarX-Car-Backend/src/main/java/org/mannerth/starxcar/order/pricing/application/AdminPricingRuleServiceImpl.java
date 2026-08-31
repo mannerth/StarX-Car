@@ -168,7 +168,7 @@ public class AdminPricingRuleServiceImpl implements AdminPricingRuleService {
     private PricingRuleResponse response(PricingRule rule, List<PricingRuleTier> tiers) {
         return new PricingRuleResponse(rule.getId(), rule.getName(), rule.getVersion(), rule.getStatus(),
                 Boolean.TRUE.equals(rule.getDefaultRule()), rule.getBaseFare(), rule.getIncludedDistanceM(),
-                rule.getMinimumFare(), rule.getCreatedBy(), rule.getUpdatedBy(), rule.getCreatedTime(),
+                rule.getMinimumFare(), rule.getArrivalCancelFee(), rule.getCreatedBy(), rule.getUpdatedBy(), rule.getCreatedTime(),
                 rule.getUpdatedTime(), tiers.stream().map(tier -> new PricingTierResponse(tier.getId(),
                         tier.getChargeType(), tier.getRangeStart(), tier.getRangeEnd(), tier.getUnitSize(),
                         tier.getUnitPrice(), tier.getRoundingMode(), tier.getSortNo())).toList());
@@ -208,7 +208,7 @@ public class AdminPricingRuleServiceImpl implements AdminPricingRuleService {
 
     private void validateRequest(PricingRuleWriteRequest request, String name) {
         PricingRuleDefinition definition = new PricingRuleDefinition(1L, name, 1, PricingRuleStatus.draft, false,
-                request.baseFare(), request.includedDistanceM(), request.minimumFare(), request.tiers().stream()
+                request.baseFare(), request.includedDistanceM(), request.minimumFare(), request.arrivalCancelFee(), request.tiers().stream()
                 .map(tier -> new PricingTierDefinition(1L, tier.chargeType(), tier.rangeStart(), tier.rangeEnd(),
                         tier.unitSize(), tier.unitPrice(), tier.roundingMode(), tier.sortNo()))
                 .toList());
@@ -218,7 +218,7 @@ public class AdminPricingRuleServiceImpl implements AdminPricingRuleService {
     private void validatePersistedRule(PricingRule rule, List<PricingRuleTier> tiers) {
         PricingRuleDefinition definition = new PricingRuleDefinition(rule.getId(), rule.getName(), rule.getVersion(),
                 rule.getStatus(), Boolean.TRUE.equals(rule.getDefaultRule()), rule.getBaseFare(),
-                rule.getIncludedDistanceM(), rule.getMinimumFare(), tiers.stream()
+                rule.getIncludedDistanceM(), rule.getMinimumFare(), rule.getArrivalCancelFee(), tiers.stream()
                 .map(tier -> new PricingTierDefinition(tier.getId(), tier.getChargeType(), tier.getRangeStart(),
                         tier.getRangeEnd(), tier.getUnitSize(), tier.getUnitPrice(), tier.getRoundingMode(),
                         tier.getSortNo()))
@@ -242,6 +242,7 @@ public class AdminPricingRuleServiceImpl implements AdminPricingRuleService {
         rule.setBaseFare(request.baseFare());
         rule.setIncludedDistanceM(request.includedDistanceM());
         rule.setMinimumFare(request.minimumFare());
+        rule.setArrivalCancelFee(request.arrivalCancelFee());
     }
 
     private String normalizedName(String name) {

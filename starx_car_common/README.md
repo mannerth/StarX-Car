@@ -2,6 +2,8 @@
 
 `starx_car_common` 是 StarX-Car 乘客端与司机端共用的本地 Flutter package，不发布至 pub.dev。它提供跨角色基础设施与基础模型，绝不包含角色页面、路由、状态管理或订单业务。
 
+公共包还提供余额模型和 `WalletApi` 传输层；具体的充值、提现和订单结算流程仍分别属于乘客端、司机端和后端。
+
 当前使用 FVM Flutter `3.44.8`、Dart `3.12.2`；两个 App 以 path 依赖引用本包。
 
 ## 当前状态

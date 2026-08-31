@@ -14,5 +14,6 @@ public enum OrderEventType {
     ARRIVE,
     START_SERVICE,
     COMPLETE,
+    TERMINATE,
     CANCEL
 }

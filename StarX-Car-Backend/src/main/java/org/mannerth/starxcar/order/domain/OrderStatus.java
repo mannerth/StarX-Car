@@ -14,5 +14,6 @@ public enum OrderStatus {
     DRIVER_ARRIVED,
     IN_SERVICE,
     COMPLETED,
+    TERMINATED,
     CANCELLED
 }

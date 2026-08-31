@@ -99,6 +99,10 @@ final carsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) {
   ref.watch(driverAuthProvider);
   return ref.read(driverRepositoryProvider).getCars();
 });
+final driverWalletProvider = FutureProvider<WalletBalance>((ref) {
+  ref.watch(driverAuthProvider);
+  return ref.read(driverRepositoryProvider).walletBalance();
+});
 
 class DriverHomePage extends ConsumerWidget {
   const DriverHomePage({super.key});
@@ -135,6 +139,7 @@ class DriverProfileTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userProfileProvider);
     final driver = ref.watch(driverProfileProvider);
+    final wallet = ref.watch(driverWalletProvider);
     if (user.isLoading || driver.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -176,6 +181,16 @@ class DriverProfileTab extends ConsumerWidget {
           u.realName ?? u.username,
           style: Theme.of(context).textTheme.headlineSmall,
         ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.account_balance_wallet_outlined),
+            title: const Text('收入余额'),
+            subtitle: wallet.when(loading: () => const Text('加载中…'), error: (_, _) => const Text('加载失败，点击重试'), data: (value) => Text('${value.balance.toStringAsFixed(2)} 元')),
+            trailing: const Icon(Icons.arrow_outward),
+            onTap: () => _withdraw(context, ref),
+          ),
+        ),
+        const SizedBox(height: 12),
         Card(
           child: Column(
             children: [
@@ -276,6 +291,12 @@ class DriverProfileTab extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _withdraw(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController();
+    await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(title: const Text('余额提现'), content: TextField(controller: controller, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '提现金额（元）')), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('取消')), FilledButton(onPressed: () async { final amount = double.tryParse(controller.text.trim()); if (amount == null || amount <= 0) { ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(content: Text('请输入大于 0 的金额'))); return; } try { await ref.read(driverRepositoryProvider).withdraw(amount); ref.invalidate(driverWalletProvider); if (dialogContext.mounted) Navigator.pop(dialogContext); } on ApiException catch (error) { if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(error.message))); } }, child: const Text('确认提现'))]));
+    controller.dispose();
   }
 
   Future<void> _deleteAccount(BuildContext context, WidgetRef ref) async {

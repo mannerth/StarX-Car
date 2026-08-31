@@ -27,6 +27,7 @@ public class PricingRule {
     private BigDecimal baseFare;
     private Long includedDistanceM;
     private BigDecimal minimumFare;
+    private BigDecimal arrivalCancelFee;
     private Long createdBy;
     private Long updatedBy;
     private LocalDateTime createdTime;

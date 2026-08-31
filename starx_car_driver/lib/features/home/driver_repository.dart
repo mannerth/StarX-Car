@@ -11,6 +11,9 @@ final driverRepositoryProvider = Provider<DriverRepository>(
 class DriverRepository {
   const DriverRepository(this._api);
   final ApiClient _api;
+  Future<WalletBalance> walletBalance() => WalletApi(_api).balance();
+
+  Future<WalletBalance> withdraw(double amount) => WalletApi(_api).withdraw(amount);
   Future<UserProfile> getUser() async =>
       UserProfile.fromJson(await _api.get('/users/me') as Map<String, dynamic>);
   Future<Map<String, dynamic>> getDriver() async =>

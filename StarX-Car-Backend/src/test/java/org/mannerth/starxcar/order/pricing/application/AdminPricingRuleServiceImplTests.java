@@ -71,7 +71,7 @@ class AdminPricingRuleServiceImplTests {
     @Test
     void rejectsPiecewiseRuleWithGapBeforeWriting() {
         PricingRuleWriteRequest invalid = new PricingRuleWriteRequest("规则", new BigDecimal("5.00"), 2000L,
-                new BigDecimal("5.00"), List.of(
+                new BigDecimal("5.00"), new BigDecimal("5.00"), List.of(
                 tier(FareChargeType.DISTANCE, 0, 2000L, 1000, "0.00", 10),
                 tier(FareChargeType.DISTANCE, 3000, null, 1000, "3.00", 20),
                 tier(FareChargeType.DRIVING_TIME, 0, null, 60, "0.20", 10),
@@ -134,7 +134,7 @@ class AdminPricingRuleServiceImplTests {
 
     private PricingRuleWriteRequest request() {
         return new PricingRuleWriteRequest("默认即时叫车规则", new BigDecimal("5.00"), 2000L,
-                new BigDecimal("5.00"), List.of(
+                new BigDecimal("5.00"), new BigDecimal("5.00"), List.of(
                 tier(FareChargeType.DISTANCE, 0, 2000L, 1000, "0.00", 10),
                 tier(FareChargeType.DISTANCE, 2000, 12000L, 1000, "3.00", 20),
                 tier(FareChargeType.DISTANCE, 12000, null, 1000, "1.20", 30),

@@ -1,6 +1,6 @@
 # StarX-Car 乘客端
 
-`starx_car_passenger` 是 StarX-Car 的乘客 Android App，依赖本地 `starx_car_common` 提供会话、网络和高德地图基础能力。本阶段已完成账号、即时叫车、订单详情、司机位置轮询和服务中路线展示。
+`starx_car_passenger` 是 StarX-Car 的乘客 Android App，依赖本地 `starx_car_common` 提供会话、网络和高德地图基础能力。本阶段已完成账号、即时叫车、订单详情、司机位置轮询和服务中路线展示，并在个人中心提供真实余额展示和模拟充值入口。
 
 ## 当前状态
 
@@ -129,4 +129,3 @@ fvm flutter test integration_test/app_start_test.dart
 - 地点名称自动补全和搜索结果分页。
 - 更细粒度的后台恢复提示和真机定位权限引导。
 - 支付、推送通知和 WebSocket。
-

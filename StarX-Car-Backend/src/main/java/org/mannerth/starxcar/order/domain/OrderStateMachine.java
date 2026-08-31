@@ -35,8 +35,10 @@ public final class OrderStateMachine {
                 OrderEventType.CANCEL, OrderStatus.CANCELLED));
         transitions.put(OrderStatus.ACCEPTED, transitions(OrderEventType.ARRIVE, OrderStatus.DRIVER_ARRIVED,
                 OrderEventType.CANCEL, OrderStatus.CANCELLED));
-        transitions.put(OrderStatus.DRIVER_ARRIVED, transitions(OrderEventType.START_SERVICE, OrderStatus.IN_SERVICE));
-        transitions.put(OrderStatus.IN_SERVICE, transitions(OrderEventType.COMPLETE, OrderStatus.COMPLETED));
+        transitions.put(OrderStatus.DRIVER_ARRIVED, transitions(OrderEventType.START_SERVICE, OrderStatus.IN_SERVICE,
+                OrderEventType.CANCEL, OrderStatus.CANCELLED));
+        transitions.put(OrderStatus.IN_SERVICE, transitions(OrderEventType.COMPLETE, OrderStatus.COMPLETED,
+                OrderEventType.TERMINATE, OrderStatus.TERMINATED));
         return Map.copyOf(transitions);
     }
 

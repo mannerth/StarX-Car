@@ -24,10 +24,7 @@ void main() {
     final recorded = DateTime(2026, 8, 6, 12, 3, 4);
 
     await repository.reportLocation(
-      point: const GeoPoint(
-        latitude: 31.23456789,
-        longitude: 121.45678912,
-      ),
+      point: const GeoPoint(latitude: 31.23456789, longitude: 121.45678912),
       recordedTime: recorded,
       accuracyM: 4.5,
       speedMps: 2.1,
@@ -94,7 +91,9 @@ void main() {
       expect(
         api.calls
             .firstWhere(
-              (call) => '${call.method} ${call.path}' == 'POST /orders/ORD-4/start-service',
+              (call) =>
+                  '${call.method} ${call.path}' ==
+                  'POST /orders/ORD-4/start-service',
             )
             .data,
         {'phoneTail': '1234'},
@@ -112,32 +111,45 @@ void main() {
     expect(api.lastPath, 'DELETE /drivers/me');
   });
 
-  test('myRatings sends page/size and parses the received rating history', () async {
-    final api = RecordingApiClient({
-      'GET /drivers/me/ratings': {
-        'page': 1,
-        'size': 20,
-        'total': 1,
-        'records': [
-          {
-            'orderNo': 'ORD-9',
-            'rating': 5,
-            'content': '服务很好',
-            'createdAt': '2026-08-13 12:00:00',
-          },
-        ],
-      },
-    });
+  test('order detail forwards its cancellation token', () async {
+    final api = RecordingApiClient({'GET /orders/ORD-5': _orderDetail()});
+    final cancelToken = CancelToken();
 
-    final page = await DriverRepository(api).myRatings(page: 1, size: 20);
+    await DriverRepository(api).detail('ORD-5', cancelToken: cancelToken);
 
-    expect(api.lastPath, 'GET /drivers/me/ratings');
-    expect(api.calls.single.query, {'page': 1, 'size': 20});
-    expect(page.total, 1);
-    expect(page.records.single.orderNo, 'ORD-9');
-    expect(page.records.single.rating, 5);
-    expect(page.records.single.content, '服务很好');
+    expect(api.lastPath, 'GET /orders/ORD-5');
+    expect(api.calls.last.cancelToken, same(cancelToken));
   });
+
+  test(
+    'myRatings sends page/size and parses the received rating history',
+    () async {
+      final api = RecordingApiClient({
+        'GET /drivers/me/ratings': {
+          'page': 1,
+          'size': 20,
+          'total': 1,
+          'records': [
+            {
+              'orderNo': 'ORD-9',
+              'rating': 5,
+              'content': '服务很好',
+              'createdAt': '2026-08-13 12:00:00',
+            },
+          ],
+        },
+      });
+
+      final page = await DriverRepository(api).myRatings(page: 1, size: 20);
+
+      expect(api.lastPath, 'GET /drivers/me/ratings');
+      expect(api.calls.single.query, {'page': 1, 'size': 20});
+      expect(page.total, 1);
+      expect(page.records.single.orderNo, 'ORD-9');
+      expect(page.records.single.rating, 5);
+      expect(page.records.single.content, '服务很好');
+    },
+  );
 }
 
 Map<String, String> _fare() => {
@@ -146,6 +158,23 @@ Map<String, String> _fare() => {
   'drivingTimeFare': '1.00',
   'waitingFare': '0.50',
   'totalFare': '18.50',
+};
+
+Map<String, dynamic> _orderDetail() => {
+  'orderNo': 'ORD-5',
+  'status': 'ACCEPTED',
+  'pickupName': '上车点',
+  'pickupLat': 31.2,
+  'pickupLng': 121.4,
+  'destinationName': '目的地',
+  'destinationLat': 31.3,
+  'destinationLng': 121.5,
+  'estimatedDistanceM': 1000,
+  'estimatedDurationS': 300,
+  'billingDistanceM': 0,
+  'fare': _fare(),
+  'estimatedFare': true,
+  'events': const [],
 };
 
 class RecordedCall {
@@ -220,5 +249,3 @@ class RecordingApiClient extends ApiClient {
     return responses['DELETE $path'];
   }
 }
-
-

@@ -13,7 +13,13 @@ import 'driver_work_controller.dart';
 final driverOrderDetailProvider = FutureProvider.autoDispose
     .family<OrderDetail, String>((ref, orderNo) {
       ref.watch(driverAuthProvider);
-      return ref.read(driverRepositoryProvider).detail(orderNo);
+      final cancelToken = CancelToken();
+      ref.onDispose(
+        () => cancelToken.cancel('driver order detail provider disposed'),
+      );
+      return ref
+          .read(driverRepositoryProvider)
+          .detail(orderNo, cancelToken: cancelToken);
     });
 
 /// Key for the driver order map route planner. The status and coordinates are
@@ -49,97 +55,94 @@ class _DriverOrderRouteData {
 }
 
 final driverOrderRouteProvider = StreamProvider.autoDispose
-    .family<_DriverOrderRouteData, _DriverRouteRequest>(
-      (ref, request) async* {
-        ref.watch(driverAuthProvider);
-        final routeService = const AmapRouteService();
-        final locationService = AmapLocationService();
-        ref.onDispose(() => unawaited(locationService.dispose()));
-        final pickup = GeoPoint(
-          latitude: request.pickupLat,
-          longitude: request.pickupLng,
-        );
-        final destination = GeoPoint(
-          latitude: request.destLat,
-          longitude: request.destLng,
-        );
-        GeoPoint? driverLocation;
-        String? locationError;
-        GeoPoint? plannedOrigin;
-        DateTime? plannedAt;
-        AmapDrivingRoute? route;
-        String? routeError;
-        var planning = false;
-        yield _DriverOrderRouteData(status: request.status);
-        locationService.start(interval: const Duration(seconds: 2));
-        await for (final update in locationService.updates) {
-          final point = update.point;
-          if (point != null) {
-            driverLocation = point;
-            locationError = null;
-          } else {
-            locationError =
-                update.errorMessage ?? '无法获取当前位置，请检查定位权限和 GPS。';
-            if (driverLocation == null) {
-              yield _DriverOrderRouteData(
-                status: request.status,
-                locationError: locationError,
-              );
-              continue;
-            }
+    .family<_DriverOrderRouteData, _DriverRouteRequest>((ref, request) async* {
+      ref.watch(driverAuthProvider);
+      final routeService = const AmapRouteService();
+      final locationService = AmapLocationService();
+      ref.onDispose(() => unawaited(locationService.dispose()));
+      final pickup = GeoPoint(
+        latitude: request.pickupLat,
+        longitude: request.pickupLng,
+      );
+      final destination = GeoPoint(
+        latitude: request.destLat,
+        longitude: request.destLng,
+      );
+      GeoPoint? driverLocation;
+      String? locationError;
+      GeoPoint? plannedOrigin;
+      DateTime? plannedAt;
+      AmapDrivingRoute? route;
+      String? routeError;
+      var planning = false;
+      yield _DriverOrderRouteData(status: request.status);
+      locationService.start(interval: const Duration(seconds: 2));
+      await for (final update in locationService.updates) {
+        final point = update.point;
+        if (point != null) {
+          driverLocation = point;
+          locationError = null;
+        } else {
+          locationError = update.errorMessage ?? '无法获取当前位置，请检查定位权限和 GPS。';
+          if (driverLocation == null) {
+            yield _DriverOrderRouteData(
+              status: request.status,
+              locationError: locationError,
+            );
+            continue;
           }
-          final target = switch (request.status) {
-            OrderStatus.accepted || OrderStatus.driverArrived => pickup,
-            OrderStatus.inService => destination,
-            _ => null,
-          };
-          final showRoute =
-              request.status == OrderStatus.accepted ||
-              request.status == OrderStatus.inService;
-          if (showRoute && target != null && !planning) {
-            final now = DateTime.now();
-            final distanceMoved = plannedOrigin == null
-                ? double.infinity
-                : _distanceM(plannedOrigin, driverLocation);
-            final secondsSincePlan = plannedAt == null
-                ? double.infinity
-                : now.difference(plannedAt).inSeconds;
-            final shouldRefresh = route == null
-                ? plannedAt == null || secondsSincePlan >= 30
-                : distanceMoved >= 100 || secondsSincePlan >= 30;
-            if (shouldRefresh) {
-              planning = true;
-              plannedAt = now;
-              try {
-                route = await routeService.planDriving(
-                  origin: driverLocation,
-                  destination: target,
-                );
-                plannedOrigin = driverLocation;
-                routeError = null;
-              } on Object {
-                routeError = '路线规划暂不可用，请稍后重试';
-              } finally {
-                planning = false;
-              }
-            }
-          } else if (!showRoute) {
-            route = null;
-            plannedOrigin = null;
-            plannedAt = null;
-            routeError = null;
-          }
-          yield _DriverOrderRouteData(
-            status: request.status,
-            driverLocation: driverLocation,
-            route: route,
-            routeError: routeError,
-            locationError: locationError,
-            routing: planning,
-          );
         }
-      },
-    );
+        final target = switch (request.status) {
+          OrderStatus.accepted || OrderStatus.driverArrived => pickup,
+          OrderStatus.inService => destination,
+          _ => null,
+        };
+        final showRoute =
+            request.status == OrderStatus.accepted ||
+            request.status == OrderStatus.inService;
+        if (showRoute && target != null && !planning) {
+          final now = DateTime.now();
+          final distanceMoved = plannedOrigin == null
+              ? double.infinity
+              : _distanceM(plannedOrigin, driverLocation);
+          final secondsSincePlan = plannedAt == null
+              ? double.infinity
+              : now.difference(plannedAt).inSeconds;
+          final shouldRefresh = route == null
+              ? plannedAt == null || secondsSincePlan >= 30
+              : distanceMoved >= 100 || secondsSincePlan >= 30;
+          if (shouldRefresh) {
+            planning = true;
+            plannedAt = now;
+            try {
+              route = await routeService.planDriving(
+                origin: driverLocation,
+                destination: target,
+              );
+              plannedOrigin = driverLocation;
+              routeError = null;
+            } on Object {
+              routeError = '路线规划暂不可用，请稍后重试';
+            } finally {
+              planning = false;
+            }
+          }
+        } else if (!showRoute) {
+          route = null;
+          plannedOrigin = null;
+          plannedAt = null;
+          routeError = null;
+        }
+        yield _DriverOrderRouteData(
+          status: request.status,
+          driverLocation: driverLocation,
+          route: route,
+          routeError: routeError,
+          locationError: locationError,
+          routing: planning,
+        );
+      }
+    });
 
 /// Driver-facing detail and state transition screen for one order.
 class DriverOrderDetailPage extends ConsumerStatefulWidget {
@@ -154,6 +157,25 @@ class DriverOrderDetailPage extends ConsumerStatefulWidget {
 
 class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
   bool _busy = false;
+  Timer? _refreshTimer;
+  OrderStatus? _lastStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      final status = _lastStatus;
+      if (status == null || !_isActive(status)) return;
+      ref.invalidate(driverOrderDetailProvider(widget.orderNo));
+      ref.invalidate(driverOrdersProvider);
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +189,10 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
           onRetry: () =>
               ref.invalidate(driverOrderDetailProvider(widget.orderNo)),
         ),
-        data: _content,
+        data: (order) {
+          _lastStatus = order.status;
+          return _content(order);
+        },
       ),
     );
   }
@@ -243,10 +268,7 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
           ),
         if (order.status == OrderStatus.driverArrived) ...[
           const Divider(height: 8),
-          _InfoRow(
-            label: '乘客手机尾号',
-            value: order.passengerPhoneTail ?? '未提供',
-          ),
+          _InfoRow(label: '乘客手机尾号', value: order.passengerPhoneTail ?? '未提供'),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _busy ? null : () => _confirmStartService(order),
@@ -439,6 +461,11 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
   ).showSnackBar(SnackBar(content: Text(message)));
 }
 
+bool _isActive(OrderStatus status) =>
+    status == OrderStatus.accepted ||
+    status == OrderStatus.driverArrived ||
+    status == OrderStatus.inService;
+
 class _DriverOrderMap extends ConsumerWidget {
   const _DriverOrderMap({required this.order});
 
@@ -464,9 +491,7 @@ class _DriverOrderMap extends ConsumerWidget {
       error: (error, _) => SizedBox(
         height: 260,
         child: Center(
-          child: Text(
-            error is ApiException ? error.message : '地图路线加载失败，请稍后重试',
-          ),
+          child: Text(error is ApiException ? error.message : '地图路线加载失败，请稍后重试'),
         ),
       ),
       data: _buildMap,
@@ -622,5 +647,3 @@ String _formatTime(DateTime time) {
   String two(int n) => n.toString().padLeft(2, '0');
   return '${two(time.month)}-${two(time.day)} ${two(time.hour)}:${two(time.minute)}';
 }
-
-

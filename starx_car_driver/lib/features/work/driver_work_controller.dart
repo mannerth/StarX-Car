@@ -28,6 +28,7 @@ class DriverWorkController extends AsyncNotifier<bool> {
   AmapLocationService? _location;
   StreamSubscription<AmapLocationUpdate>? _locationSubscription;
   Timer? _pendingTimer;
+  Timer? _driverOrdersTimer;
   Timer? _locationRetryTimer;
   AmapLocationUpdate? _pendingLocation;
   bool _sendingLocation = false;
@@ -102,6 +103,13 @@ class DriverWorkController extends AsyncNotifier<bool> {
       const Duration(seconds: 5),
       (_) => ref.invalidate(pendingOrdersProvider),
     );
+    // A passenger can cancel after the driver accepts the order. Keep the
+    // active-order list in sync with that server-side transition as well as
+    // the pending-order list, so the workbench recovers without re-entering.
+    _driverOrdersTimer ??= Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => ref.invalidate(driverOrdersProvider),
+    );
   }
 
   void _disposeTasks() {
@@ -115,6 +123,8 @@ class DriverWorkController extends AsyncNotifier<bool> {
   void _pauseTasks() {
     _pendingTimer?.cancel();
     _pendingTimer = null;
+    _driverOrdersTimer?.cancel();
+    _driverOrdersTimer = null;
     _locationRetryTimer?.cancel();
     _locationRetryTimer = null;
     _pendingLocation = null;
@@ -255,4 +265,3 @@ final driverOrdersProvider = FutureProvider.autoDispose<OrderPage>((ref) {
   ref.onDispose(() => cancelToken.cancel('driver orders provider disposed'));
   return ref.read(driverRepositoryProvider).orders(cancelToken: cancelToken);
 });
-

@@ -99,8 +99,12 @@ class DriverRepository {
     );
   }
 
-  Future<OrderDetail> detail(String orderNo) async => OrderDetail.fromJson(
-    await _api.get('/orders/$orderNo') as Map<String, dynamic>,
+  Future<OrderDetail> detail(
+    String orderNo, {
+    CancelToken? cancelToken,
+  }) async => OrderDetail.fromJson(
+    await _api.get('/orders/$orderNo', cancelToken: cancelToken)
+        as Map<String, dynamic>,
   );
 
   Future<void> acceptOrder(String orderNo) async =>
@@ -113,8 +117,13 @@ class DriverRepository {
   );
   Future<void> arrive(String orderNo) async =>
       _api.post('/orders/$orderNo/arrive');
-  Future<void> startService(String orderNo, {required String phoneTail}) async =>
-      _api.post('/orders/$orderNo/start-service', data: {'phoneTail': phoneTail});
+  Future<void> startService(
+    String orderNo, {
+    required String phoneTail,
+  }) async => _api.post(
+    '/orders/$orderNo/start-service',
+    data: {'phoneTail': phoneTail},
+  );
   Future<OrderCompletionResult> complete(String orderNo) async =>
       OrderCompletionResult.fromJson(
         await _api.post('/orders/$orderNo/complete') as Map<String, dynamic>,
@@ -178,7 +187,6 @@ String _formatBackendTime(DateTime value) {
   return '${local.year}-${two(local.month)}-${two(local.day)} '
       '${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
 }
-
 
 /// One rating the driver received, as shown in the driver's rating history.
 class RatingSummary {

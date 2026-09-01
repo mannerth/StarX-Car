@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { fetchDrivers, reviewDriver } from '@/api/drivers'
 import { useAuthStore } from '@/stores/auth'
 import type { AdminDriver, DriverApprovalStatus } from '@/types/api'
+import { driverApprovalLabel, userStatusLabel } from '@/utils/display'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -18,7 +19,6 @@ const reviewingId = ref<number | null>(null)
 const error = ref('')
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size)))
 
-const approvalLabel: Record<DriverApprovalStatus, string> = { pending: '待审核', approved: '已通过', rejected: '已驳回' }
 const workLabel = { offline: '未出车', online: '听单中', busy: '服务中' }
 
 async function load() {
@@ -59,7 +59,7 @@ onMounted(() => void load())
         <p v-if="error" class="error">{{ error }}</p>
         <div class="table-wrap"><table class="driver-table"><thead><tr><th>司机</th><th>联系方式</th><th>证件资料</th><th>当前车辆</th><th>状态</th><th>申请时间</th><th>操作</th></tr></thead><tbody>
           <tr v-if="loading"><td colspan="7" class="empty">正在加载...</td></tr><tr v-else-if="!drivers.length"><td colspan="7" class="empty">没有符合条件的司机</td></tr>
-          <tr v-for="driver in drivers" :key="driver.id"><td><strong>{{ driver.realName || '未填写姓名' }}</strong><small>#{{ driver.id }} · {{ driver.username || '账号缺失' }}</small></td><td>{{ driver.displayPhone || driver.phoneNumber }}<small>账号：{{ driver.userStatus || '未知' }}</small></td><td>驾驶证 {{ driver.licenseNumber }}<small>身份证 {{ maskIdCard(driver.idCardNo) }}</small><small>有效期 {{ driver.licenseExpireDate || '未填写' }}</small></td><td>{{ driver.carNumber || '未绑定车辆' }}<small v-if="driver.carId">{{ driver.carBrand || '品牌未填' }} · {{ driver.carColor || '颜色未填' }}</small></td><td><span class="status" :class="driver.approvalStatus">{{ approvalLabel[driver.approvalStatus] }}</span><small>{{ workLabel[driver.workStatus] }}</small></td><td>{{ formatDate(driver.createTime) }}</td><td class="actions"><template v-if="driver.approvalStatus === 'pending'"><button class="text-button" :disabled="reviewingId === driver.id" @click="review(driver, 'approved')">通过</button><button class="text-button danger" :disabled="reviewingId === driver.id" @click="review(driver, 'rejected')">驳回</button></template><span v-else class="muted">已处理</span></td></tr>
+          <tr v-for="driver in drivers" :key="driver.id"><td><strong>{{ driver.realName || '未填写姓名' }}</strong><small>#{{ driver.id }} · {{ driver.username || '账号缺失' }}</small></td><td>{{ driver.displayPhone || driver.phoneNumber }}<small>账号：{{ driver.userStatus ? userStatusLabel[driver.userStatus] : '未知' }}</small></td><td>驾驶证 {{ driver.licenseNumber }}<small>身份证 {{ maskIdCard(driver.idCardNo) }}</small><small>有效期 {{ driver.licenseExpireDate || '未填写' }}</small></td><td>{{ driver.carNumber || '未绑定车辆' }}<small v-if="driver.carId">{{ driver.carBrand || '品牌未填' }} · {{ driver.carColor || '颜色未填' }}</small></td><td><span class="status" :class="driver.approvalStatus">{{ driverApprovalLabel[driver.approvalStatus] }}</span><small>{{ workLabel[driver.workStatus] }}</small></td><td>{{ formatDate(driver.createTime) }}</td><td class="actions"><template v-if="driver.approvalStatus === 'pending'"><button class="text-button" :disabled="reviewingId === driver.id" @click="review(driver, 'approved')">通过</button><button class="text-button danger" :disabled="reviewingId === driver.id" @click="review(driver, 'rejected')">驳回</button></template><span v-else class="muted">已处理</span></td></tr>
         </tbody></table></div>
         <footer class="pagination"><span>共 {{ total }} 位司机</span><div><button :disabled="page <= 1 || loading" @click="page--; load()">上一页</button><span>第 {{ page }} / {{ totalPages }} 页</span><button :disabled="page >= totalPages || loading" @click="page++; load()">下一页</button></div></footer>
       </section>

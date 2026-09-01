@@ -2,10 +2,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { activatePricingRule, archivePricingRule, createPricingRule, fetchPricingRules, updatePricingRule } from '@/api/pricing'
 import { useAuthStore } from '@/stores/auth'
-import type { FareChargeType, PricingRule, PricingRuleStatus, PricingRuleWriteRequest } from '@/types/api'
+import type { PricingFareChargeType, PricingRule, PricingRuleStatus, PricingRuleWriteRequest } from '@/types/api'
 
 interface TierForm {
-  chargeType: FareChargeType
+  chargeType: PricingFareChargeType
   rangeStart: number
   rangeEnd: number | null
   unitSize: number
@@ -27,8 +27,8 @@ const form = ref({ name: '', baseFare: 5, includedDistanceM: 2000, minimumFare: 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size)))
 
 const statusLabel: Record<PricingRuleStatus, string> = { draft: '草稿', active: '已启用', inactive: '已停用', archived: '已归档' }
-const typeLabel: Record<FareChargeType, string> = { DISTANCE: '里程', DRIVING_TIME: '行程时间', WAITING_TIME: '等待时间' }
-const chargeTypes: FareChargeType[] = ['DISTANCE', 'DRIVING_TIME', 'WAITING_TIME']
+const typeLabel: Record<PricingFareChargeType, string> = { DISTANCE: '里程', DRIVING_TIME: '行程时间', WAITING_TIME: '等待时间' }
+const chargeTypes: PricingFareChargeType[] = ['DISTANCE', 'DRIVING_TIME', 'WAITING_TIME']
 
 function initialTiers(): TierForm[] {
   return [
@@ -63,8 +63,8 @@ function openEdit(rule: PricingRule) {
   form.value = { name: rule.name, baseFare: Number(rule.baseFare), includedDistanceM: rule.includedDistanceM, minimumFare: Number(rule.minimumFare), arrivalCancelFee: Number(rule.arrivalCancelFee), tiers: rule.tiers.map((tier) => ({ chargeType: tier.chargeType, rangeStart: tier.rangeStart, rangeEnd: tier.rangeEnd, unitSize: tier.unitSize, unitPrice: Number(tier.unitPrice) })) }
 }
 function closeModal() { editing.value = null }
-function tiersFor(type: FareChargeType) { return form.value.tiers.filter((tier) => tier.chargeType === type) }
-function addTier(type: FareChargeType) {
+function tiersFor(type: PricingFareChargeType) { return form.value.tiers.filter((tier) => tier.chargeType === type) }
+function addTier(type: PricingFareChargeType) {
   const group = tiersFor(type)
   const last = group.at(-1)
   const start = last?.rangeEnd ?? last?.rangeStart ?? 0
@@ -106,7 +106,7 @@ async function archive(rule: PricingRule) {
   try { await archivePricingRule(rule.id); await load() }
   catch (reason) { error.value = reason instanceof Error ? reason.message : '归档规则失败。' }
 }
-function unitLabel(type: FareChargeType) { return type === 'DISTANCE' ? '米' : '秒' }
+function unitLabel(type: PricingFareChargeType) { return type === 'DISTANCE' ? '米' : '秒' }
 onMounted(() => void load())
 </script>
 

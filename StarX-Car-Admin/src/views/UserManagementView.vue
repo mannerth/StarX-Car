@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { deleteUser, fetchUsers, resetUserPassword, updateUser } from '@/api/users'
 import { useAuthStore } from '@/stores/auth'
 import type { Gender, User, UserStatus, UserType } from '@/types/api'
+import { userStatusLabel, userTypeLabel } from '@/utils/display'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -19,7 +20,6 @@ const editing = ref<User | null>(null)
 const form = ref({ username: '', email: '', gender: 'male' as Gender, realName: '', avatarUrl: '', status: 'active' as UserStatus })
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size)))
 
-const typeLabel: Record<UserType, string> = { admin: '管理员', passenger: '乘客', driver: '司机' }
 const genderLabel: Record<Gender, string> = { male: '男', female: '女' }
 
 async function load() {
@@ -76,7 +76,7 @@ onMounted(() => void load())
       <section class="panel">
         <form class="filters" @submit.prevent="search"><input v-model="keyword" placeholder="搜索用户名或邮箱" /><select v-model="type"><option value="">全部用户类型</option><option value="admin">管理员</option><option value="passenger">乘客</option><option value="driver">司机</option></select><button>查询</button></form>
         <p v-if="error" class="error">{{ error }}</p>
-        <div class="table-wrap"><table><thead><tr><th>ID</th><th>用户名 / 姓名</th><th>邮箱</th><th>性别</th><th>类型</th><th>状态</th><th>最近登录</th><th>操作</th></tr></thead><tbody><tr v-if="loading"><td colspan="8" class="empty">正在加载…</td></tr><tr v-else-if="!users.length"><td colspan="8" class="empty">没有符合条件的用户</td></tr><tr v-for="user in users" :key="user.id"><td>#{{ user.id }}</td><td>{{ user.username }}<small>{{ user.realName || '未实名' }}</small></td><td>{{ user.email || '—' }}</td><td>{{ user.gender ? genderLabel[user.gender] : '—' }}</td><td><span class="tag" :class="user.type">{{ typeLabel[user.type] }}</span></td><td>{{ user.status }}</td><td>{{ format(user.lastLoginTime) }}</td><td class="actions"><button class="text-button" @click="edit(user)">编辑</button><button class="text-button" @click="resetPassword(user)">重置密码</button><button v-if="user.type !== 'admin'" class="text-button danger" @click="remove(user)">删除</button></td></tr></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>用户名 / 姓名</th><th>邮箱</th><th>性别</th><th>类型</th><th>状态</th><th>最近登录</th><th>操作</th></tr></thead><tbody><tr v-if="loading"><td colspan="8" class="empty">正在加载…</td></tr><tr v-else-if="!users.length"><td colspan="8" class="empty">没有符合条件的用户</td></tr><tr v-for="user in users" :key="user.id"><td>#{{ user.id }}</td><td>{{ user.username }}<small>{{ user.realName || '未实名' }}</small></td><td>{{ user.email || '—' }}</td><td>{{ user.gender ? genderLabel[user.gender] : '—' }}</td><td><span class="tag" :class="user.type">{{ userTypeLabel[user.type] }}</span></td><td>{{ userStatusLabel[user.status] }}</td><td>{{ format(user.lastLoginTime) }}</td><td class="actions"><button class="text-button" @click="edit(user)">编辑</button><button class="text-button" @click="resetPassword(user)">重置密码</button><button v-if="user.type !== 'admin'" class="text-button danger" @click="remove(user)">删除</button></td></tr></tbody></table></div>
         <footer class="pagination"><span>共 {{ total }} 位用户</span><div><button :disabled="page <= 1 || loading" @click="page--; load()">上一页</button><span>第 {{ page }} / {{ totalPages }} 页</span><button :disabled="page >= totalPages || loading" @click="page++; load()">下一页</button></div></footer>
       </section>
     </section>

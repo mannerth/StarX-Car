@@ -66,11 +66,12 @@ export interface AdminDriverPage {
 }
 
 export type PricingRuleStatus = 'draft' | 'active' | 'inactive' | 'archived'
-export type FareChargeType = 'DISTANCE' | 'DRIVING_TIME' | 'WAITING_TIME'
+export type FareChargeType = 'BASE' | 'ARRIVAL_CANCEL' | 'DISTANCE' | 'DRIVING_TIME' | 'WAITING_TIME'
+export type PricingFareChargeType = Exclude<FareChargeType, 'BASE' | 'ARRIVAL_CANCEL'>
 
 export interface PricingTier {
   id: number
-  chargeType: FareChargeType
+  chargeType: PricingFareChargeType
   rangeStart: number
   rangeEnd: number | null
   unitSize: number
@@ -114,10 +115,12 @@ export interface PricingRuleWriteRequest {
 
 export type OrderType = 'INSTANT' | 'SCHEDULED'
 export type OrderStatus = 'SCHEDULED' | 'PENDING' | 'ACCEPTED' | 'DRIVER_ARRIVED' | 'IN_SERVICE' | 'COMPLETED' | 'TERMINATED' | 'CANCELLED'
+export type OrderEventType = 'CREATE' | 'DISPATCH' | 'ACCEPT' | 'ARRIVE' | 'START_SERVICE' | 'COMPLETE' | 'TERMINATE' | 'CANCEL'
+export type OrderOperatorType = 'passenger' | 'driver' | 'system' | 'admin'
 
 export type ComplaintStatus = 'OPEN' | 'PROCESSING' | 'RESOLVED'
 export type ComplaintResolutionType = 'APOLOGY' | 'PARTIAL_REFUND' | 'FULL_REFUND' | 'REJECT'
-export interface Complaint { complaintNo: string; orderNo: string; complaintType: string; content: string; status: ComplaintStatus; resolutionType: ComplaintResolutionType | null; refundAmount: number; createdTime: string; resolvedTime: string | null }
+export interface Complaint { complaintNo: string; orderNo: string; complaintType: string; content: string | null; status: ComplaintStatus; resolutionType: ComplaintResolutionType | null; refundAmount: number | null; createdTime: string; resolvedTime: string | null }
 export interface ComplaintPage { page: number; size: number; total: number; records: Complaint[] }
 
 export interface AdminOrderSummary {
@@ -131,10 +134,12 @@ export interface AdminOrderMetrics {
   total: number; instant: number; scheduled: number; scheduledWaitingDispatch: number; pending: number; accepted: number; inService: number; completed: number; cancelled: number; reservationAtRisk: number; completedFare: number
 }
 export interface AdminOrderNote { id: number; adminId: number; adminName: string; content: string; createdTime: string }
-export interface AdminFareItem { chargeType: string; rangeStart: number | null; rangeEnd: number | null; actualUsage: number; unitSize: number | null; unitPrice: number; chargedUnits: number; amount: number }
+export interface AdminFareItem { chargeType: FareChargeType; rangeStart: number | null; rangeEnd: number | null; actualUsage: number; unitSize: number | null; unitPrice: number; chargedUnits: number; amount: number }
 export interface AdminDriverLocation { latitude: number; longitude: number; accuracyM: number | null; speedMps: number | null; bearing: number | null; recordedTime: string | null; receivedTime: string | null }
-export interface OrderEvent { eventType: string; fromStatus: OrderStatus | null; toStatus: OrderStatus; operatorType: string; createdTime: string; remark: string | null }
-export interface AdminOrderDetail extends AdminOrderSummary {
+export interface OrderEvent { eventType: OrderEventType; fromStatus: OrderStatus | null; toStatus: OrderStatus; operatorType: OrderOperatorType; createdTime: string; remark: string | null }
+export interface OrderFare { baseFare: number; distanceFare: number; drivingTimeFare: number; waitingFare: number; totalFare: number }
+export interface AdminOrderDetail extends Omit<AdminOrderSummary, 'totalFare'> {
   pickupAddress: string | null; destinationAddress: string | null; pickupLat: number; pickupLng: number; destinationLat: number; destinationLng: number
-  baseFare: number; distanceFare: number; drivingTimeFare: number; waitingFare: number; passengerPhoneTail: string | null; driver: { displayPhone: string | null; carNumber: string | null } | null; driverArrivedTime: string | null; serviceStartedTime: string | null; cancelledTime: string | null; cancelledBy: string | null; cancelReason: string | null; events: OrderEvent[]
+  estimatedDistanceM: number; estimatedDurationS: number; billingDistanceM: number; actualDurationS: number | null; waitingDurationS: number | null
+  fare: OrderFare; passengerPhoneTail: string | null; driver: { displayPhone: string | null; carNumber: string | null } | null; driverArrivedTime: string | null; serviceStartedTime: string | null; cancelledTime: string | null; cancelledBy: OrderOperatorType | null; cancelReason: string | null; events: OrderEvent[]
 }

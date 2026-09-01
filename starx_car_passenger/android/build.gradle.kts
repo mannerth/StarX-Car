@@ -1,5 +1,8 @@
 allprojects {
     repositories {
+        // Prefer domestic mirrors; retain official repositories as fallbacks.
+        maven(url = "https://maven.aliyun.com/repository/google")
+        maven(url = "https://repo.huaweicloud.com/repository/maven/")
         google()
         mavenCentral()
     }

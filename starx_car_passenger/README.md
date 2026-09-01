@@ -104,6 +104,7 @@ lib/
 - Android 主清单已声明高德地图和一次性前台定位需要的网络、网络状态、Wi-Fi 状态、粗略/精确位置与 A-GPS 权限，并注册独立的 `APSService` 定位服务；这些配置同时适用于 debug 和 release 构建，不申请后台定位。
 - 为本地 HTTP 开发已允许 Android 明文流量；部署环境必须使用 HTTPS。
 - 因工程位于 D 盘、Flutter Pub 缓存位于 C 盘，已关闭 Kotlin 增量编译并使用进程内编译，避免 `image_picker_android` 的跨盘缓存错误；首次 Android 构建会稍慢。
+- Gradle 插件与 Android 依赖解析优先使用阿里云 Google 镜像和华为 Maven 镜像；`google()`、`mavenCentral()` 与 `gradlePluginPortal()` 保留在镜像之后作为官方兜底源。
 - `android/key.properties` 与 release keystore 均为本机敏感文件，已忽略，不能提交或分享。
 - release 签名路径从 Android 项目根目录解析，当前本机配置可使用仓库根目录 `android-signing/starx-car-release.jks` 构建；APK 证书 SHA-1 为 `4C:83:43:EE:4B:E8:5E:0B:89:7A:29:E9:83:D8:17:C1:9A:0C:BF:73`，须在高德控制台登记到乘客端 Key。
 - 当前本机 debug APK 证书 SHA-1 为 `1C:50:46:29:AE:A7:92:22:36:9C:CB:83:B7:E7:53:D1:1B:AE:D8:28`；若出现高德 `INVALID_USER_SCODE`，先确认乘客端 Key 的 Android 包名为本行 application ID，并同时登记实际构建签名的 SHA-1。

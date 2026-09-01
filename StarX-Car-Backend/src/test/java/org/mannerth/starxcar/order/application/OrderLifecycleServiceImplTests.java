@@ -104,7 +104,7 @@ class OrderLifecycleServiceImplTests {
     }
 
     @Test
-    void driverCanOnlyCancelOwnAcceptedOrder() {
+    void driverCanCancelOwnAcceptedOrArrivedOrder() {
         RideOrder order = order(OrderStatus.ACCEPTED, 2L, 7L);
         given(accessService.requireDriverOrder("O1", 2L)).willReturn(order);
         given(orderMapper.cancelOrder(10L, OrderStatus.ACCEPTED, 7L, NOW, "driver", null)).willReturn(1);
@@ -118,7 +118,8 @@ class OrderLifecycleServiceImplTests {
         assertThat(event.getValue().getOperatorType()).isEqualTo(OrderOperatorType.driver);
 
         order.setStatus(OrderStatus.DRIVER_ARRIVED);
-        assertConflict(() -> service.cancelByDriver(2L, "O1", null));
+        given(orderMapper.cancelOrder(10L, OrderStatus.DRIVER_ARRIVED, 7L, NOW, "driver", null)).willReturn(1);
+        service.cancelByDriver(2L, "O1", null);
     }
 
     @Test

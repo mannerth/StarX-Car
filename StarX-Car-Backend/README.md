@@ -110,7 +110,7 @@ src/main/java/org/mannerth/starxcar/
 - 高德业务坐标统一以 GCJ-02 持久化；`driver_location` 一期仅保存每位司机的最新位置，供后续乘客实时查看。
 - 已实现司机出车状态和最新位置上报：审核通过、账号有效且当前有效绑定车辆存在的司机可切换 `online`/`offline`；有进行中订单时不可下线，`busy` 只能由订单流程维护。`PUT /api/drivers/me/location` 仅接受 `online` 或 `busy` 司机的 GCJ-02 位置，使用 MySQL 5.6 upsert 保持一人一条最新位置，并保留 P6--P8 维护的订单关联字段。
 - 已实现司机待抢订单与并发安全抢单：只有审核通过、账号有效、`online`、当前车辆有效绑定且具有 30 秒内最新位置的司机可查看或抢单。抢单以订单 ID、`PENDING`、空 `driver_id` 和版本号作原子条件更新；成功后写入车辆快照与 `ACCEPT` 事件、司机变为 `busy`，并关联该司机的最新位置，任一步失败会回滚。
-- 已实现取消、到达和开始服务：乘客可取消自己的 `PENDING`/`ACCEPTED` 订单，接单司机仅可取消自己的 `ACCEPTED` 订单；取消已接订单会释放司机和对应位置关联。接单司机可将 `ACCEPTED` 转为 `DRIVER_ARRIVED`，再开始服务为 `IN_SERVICE`；开始服务前必须提交乘客手机尾号（后四位），服务端与乘客资料核对一致后才放行，防止司机未经身份核对开始服务。等待时长仅用服务端到达与开始时间计算。全部转换均以状态和版本号条件更新并记录审计事件。
+- 已实现取消、到达和开始服务：乘客可取消自己的 `PENDING`/`ACCEPTED`/`DRIVER_ARRIVED` 订单，接单司机可取消自己的 `ACCEPTED`/`DRIVER_ARRIVED` 订单；取消已接订单会释放司机和对应位置关联。接单司机可将 `ACCEPTED` 转为 `DRIVER_ARRIVED`，再开始服务为 `IN_SERVICE`；开始服务前必须提交乘客手机尾号（后四位），服务端与乘客资料核对一致后才放行，防止司机未经身份核对开始服务。等待时长仅用服务端到达与开始时间计算。全部转换均以状态和版本号条件更新并记录审计事件。
 - 已实现完成服务与最终结算：接单司机可将自己的 `IN_SERVICE` 订单完成，服务端用订单创建时绑定的计价规则版本、订单计费距离、实际服务时长及已记录的等待时长重新计费。事务同时更新订单最终金额与完成时间、批量写入可审计的 `order_fare_item` 明细、记录 `COMPLETE` 事件、将司机恢复为 `online` 并清除该订单的位置关联；任一写入失败都会整体回滚。重复完成返回 409。
 - 已实现乘客行程位置查看：订单乘客可在 `ACCEPTED`、`DRIVER_ARRIVED`、`IN_SERVICE` 状态读取与该订单关联的司机最新 GCJ-02 位置；超过位置保鲜窗口会明确返回 `stale=true` 和最后已知位置。仅在 `IN_SERVICE` 可获取路线规划上下文，包含司机最新位置、目的地快照和建议的重规划阈值；Flutter 客户端使用高德自行规划路线，后端不代理路线请求或保存轨迹。
 - 已实现管理员计价规则管理：管理员可分页查看、新建、查看、完整更新草稿、激活和归档版本化规则。创建时对同名规则生成下一版本；草稿更新会校验三类分段函数连续无重叠且仅允许未被订单引用的草稿。激活为默认规则时会在事务中锁定并撤销旧活动默认规则，确保同时至多一个；订单创建和结算仍按各自保存的规则 ID/版本读取，历史金额不会回写。
@@ -203,7 +203,7 @@ src/main/java/org/mannerth/starxcar/
 | `PUT` | `/api/drivers/me/location` | 司机 | 上报本人最新 GCJ-02 位置和设备记录时间，返回统一空成功响应。 |
 | `GET` | `/api/drivers/me/orders/pending` | 司机 | 分页查询当前可抢的 `PENDING` 订单；司机必须满足有效听单资格和位置保鲜要求。 |
 | `POST` | `/api/orders/{orderNo}/accept` | 司机 | 原子抢单；成功后订单为 `ACCEPTED`、司机为 `busy`。 |
-| `POST` | `/api/orders/{orderNo}/cancel` | 乘客、司机 | 取消订单；乘客限 `PENDING`/`ACCEPTED`，司机限自己已接的 `ACCEPTED`。 |
+| `POST` | `/api/orders/{orderNo}/cancel` | 乘客、司机 | 取消订单；乘客支持 `SCHEDULED`/`PENDING`/`ACCEPTED`/`DRIVER_ARRIVED`，司机限本人 `ACCEPTED`/`DRIVER_ARRIVED` 订单。 |
 | `POST` | `/api/orders/{orderNo}/arrive` | 司机 | 接单司机确认到达上车点，订单转为 `DRIVER_ARRIVED`。 |
 | `POST` | `/api/orders/{orderNo}/start-service` | 司机 | 提交 `{"phoneTail":"1234"}` 核对乘客尾号后开始服务，订单转为 `IN_SERVICE` 并返回等待秒数；尾号不一致返回 400。 |
 | `POST` | `/api/orders/{orderNo}/complete` | 司机 | 接单司机完成自己的 `IN_SERVICE` 订单，按该订单的历史规则版本生成最终金额和分段明细，并恢复司机为 `online`。 |

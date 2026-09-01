@@ -122,6 +122,30 @@ class DriverRepository {
         ? null
         : {'reason': reason.trim()},
   );
+
+  Future<void> createComplaint(
+    String orderNo, {
+    required String complaintType,
+    required String content,
+  }) async => _api.post(
+    '/orders/$orderNo/complaints',
+    data: {'complaintType': complaintType.trim(), 'content': content.trim()},
+  );
+  Future<OrderTerminationResult> terminateOrder(
+    String orderNo, {
+    required String reasonCode,
+    String? reasonDetail,
+  }) async => OrderTerminationResult.fromJson(
+    await _api.post(
+          '/orders/$orderNo/terminate',
+          data: {
+            'reasonCode': reasonCode,
+            if (reasonDetail != null && reasonDetail.trim().isNotEmpty)
+              'reasonDetail': reasonDetail.trim(),
+          },
+        )
+        as Map<String, dynamic>,
+  );
   Future<void> arrive(String orderNo) async =>
       _api.post('/orders/$orderNo/arrive');
   Future<void> startService(

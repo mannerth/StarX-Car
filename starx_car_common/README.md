@@ -34,7 +34,7 @@
 - `ApiResponse<T>`：对应后端 `{ code, message, traceId, data }` 信封。
 - `GeoPoint`、`CoordinateSystem`、`Place`：为地图与地点选择提供基础类型；提交后端时坐标统一保留 6 位小数，匹配接口精度约束。
 - 高德业务坐标统一按 `GCJ-02` 使用；设备 GPS 的 `WGS-84` 必须在地图基础层明确转换或标注，业务端不得混用。
-- `OrderStatus`、`FareQuote`、`OrderQuote`、`OrderSummary`、`OrderPage`、`OrderDetail`、`OrderEvent`、`OrderCompletionResult`、`DriverLocation` 和 `RouteContext`：只负责解析跨角色订单展示字段；金额保留十进制字符串，位置模型保留 `stale` 标志，订单事件枚举保留原始字符串以兼容服务端扩展。
+- `OrderStatus`、`FareQuote`、`OrderQuote`、`OrderSummary`、`OrderPage`、`OrderDetail`、`OrderEvent`、`OrderCompletionResult`、`OrderTerminationResult`、`DriverLocation` 和 `RouteContext`：只负责解析跨角色订单展示字段；金额保留十进制字符串，位置模型保留 `stale` 标志，订单事件枚举保留原始字符串以兼容服务端扩展；支持 `TERMINATED` 中途结束结算结果。
 - `OrderType`（`INSTANT`/`SCHEDULED`）：`OrderSummary`/`OrderDetail`/`OrderQuote` 均解析 `orderType` 与预约时间 `scheduledPickupTime`，`OrderDetail` 另解析 `dispatchTime`；订单为预约单时 `isScheduled` 为 true，旧服务端缺少字段时按即时单处理。
 
 ### 高德 Android 基础能力

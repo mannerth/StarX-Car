@@ -51,41 +51,11 @@ void main() {
     expect(api.calls.single.cancelToken, same(cancelToken));
   });
 
-  test('reservation quote sends orderType and formatted scheduled time', () async {
-    final api = RecordingApiClient({
-      'POST /orders/quote': {
-        'pricingRuleId': 3,
-        'pricingRuleVersion': 2,
-        'estimatedDistanceM': 4200,
-        'estimatedDurationS': 900,
-        'fare': _fare(),
-        'orderType': 'SCHEDULED',
-        'scheduledPickupTime': '2026-08-06 10:30:00',
-      },
-    });
-    final repository = PassengerOrderRepository(api);
-
-    final quote = await repository.quote(
-      pickup: _place('上车点', 31.2, 121.4),
-      destination: _place('目的地', 31.21, 121.42),
-      orderType: OrderType.scheduled,
-      scheduledPickupTime: DateTime(2026, 8, 6, 10, 30),
-    );
-
-    final body = api.lastData as Map<String, dynamic>;
-    expect(body['orderType'], 'SCHEDULED');
-    expect(body['scheduledPickupTime'], '2026-08-06 10:30:00');
-    expect(quote.orderType, OrderType.scheduled);
-    expect(quote.scheduledPickupTime, DateTime(2026, 8, 6, 10, 30));
-  });
-
-  test('instant create omits reservation fields and scheduled create sends them',
-      () async {
-    final api = RecordingApiClient({
-      'POST /orders': {
-        'orderNo': 'ORD-RES',
-        'status': 'SCHEDULED',
-        'quote': {
+  test(
+    'reservation quote sends orderType and formatted scheduled time',
+    () async {
+      final api = RecordingApiClient({
+        'POST /orders/quote': {
           'pricingRuleId': 3,
           'pricingRuleVersion': 2,
           'estimatedDistanceM': 4200,
@@ -94,23 +64,58 @@ void main() {
           'orderType': 'SCHEDULED',
           'scheduledPickupTime': '2026-08-06 10:30:00',
         },
-      },
-    });
-    final repository = PassengerOrderRepository(api);
+      });
+      final repository = PassengerOrderRepository(api);
 
-    final created = await repository.create(
-      pickup: _place('上车点', 31.2, 121.4),
-      destination: _place('目的地', 31.21, 121.42),
-      orderType: OrderType.scheduled,
-      scheduledPickupTime: DateTime(2026, 8, 6, 10, 30),
-    );
+      final quote = await repository.quote(
+        pickup: _place('上车点', 31.2, 121.4),
+        destination: _place('目的地', 31.21, 121.42),
+        orderType: OrderType.scheduled,
+        scheduledPickupTime: DateTime(2026, 8, 6, 10, 30),
+      );
 
-    expect(created.status, OrderStatus.scheduled);
-    expect(created.quote.orderType, OrderType.scheduled);
-    final body = api.lastData as Map<String, dynamic>;
-    expect(body['orderType'], 'SCHEDULED');
-    expect(body['scheduledPickupTime'], '2026-08-06 10:30:00');
-  });
+      final body = api.lastData as Map<String, dynamic>;
+      expect(body['orderType'], 'SCHEDULED');
+      expect(body['scheduledPickupTime'], '2026-08-06 10:30:00');
+      expect(quote.orderType, OrderType.scheduled);
+      expect(quote.scheduledPickupTime, DateTime(2026, 8, 6, 10, 30));
+    },
+  );
+
+  test(
+    'instant create omits reservation fields and scheduled create sends them',
+    () async {
+      final api = RecordingApiClient({
+        'POST /orders': {
+          'orderNo': 'ORD-RES',
+          'status': 'SCHEDULED',
+          'quote': {
+            'pricingRuleId': 3,
+            'pricingRuleVersion': 2,
+            'estimatedDistanceM': 4200,
+            'estimatedDurationS': 900,
+            'fare': _fare(),
+            'orderType': 'SCHEDULED',
+            'scheduledPickupTime': '2026-08-06 10:30:00',
+          },
+        },
+      });
+      final repository = PassengerOrderRepository(api);
+
+      final created = await repository.create(
+        pickup: _place('上车点', 31.2, 121.4),
+        destination: _place('目的地', 31.21, 121.42),
+        orderType: OrderType.scheduled,
+        scheduledPickupTime: DateTime(2026, 8, 6, 10, 30),
+      );
+
+      expect(created.status, OrderStatus.scheduled);
+      expect(created.quote.orderType, OrderType.scheduled);
+      final body = api.lastData as Map<String, dynamic>;
+      expect(body['orderType'], 'SCHEDULED');
+      expect(body['scheduledPickupTime'], '2026-08-06 10:30:00');
+    },
+  );
 
   test('list sends status filter and parses server records', () async {
     final api = RecordingApiClient({
@@ -223,6 +228,43 @@ void main() {
     expect(api.lastPath, 'DELETE /passengers/me');
   });
 
+  test('terminate posts reason and parses server settlement', () async {
+    final api = RecordingApiClient({
+      'POST /orders/ORD-TERM/terminate': {
+        'orderNo': 'ORD-TERM',
+        'status': 'TERMINATED',
+        'endedTime': '2026-08-06 12:10:00',
+        'actualDurationS': 600,
+        'billingDistanceM': 1200,
+        'totalFare': '12.50',
+      },
+    });
+    final result = await PassengerOrderRepository(api).terminate(
+      'ORD-TERM',
+      reasonCode: 'PASSENGER_REQUEST',
+      reasonDetail: '临时结束',
+    );
+    expect(api.lastData, {
+      'reasonCode': 'PASSENGER_REQUEST',
+      'reasonDetail': '临时结束',
+    });
+    expect(result.status, OrderStatus.terminated);
+    expect(result.totalFare, '12.50');
+  });
+
+  test('complaint posts trimmed type and content', () async {
+    final api = RecordingApiClient({});
+
+    await PassengerOrderRepository(api).createComplaint(
+      'ORD-TERM',
+      complaintType: ' ORDER_SERVICE ',
+      content: ' 服务问题 ',
+    );
+
+    expect(api.lastPath, 'POST /orders/ORD-TERM/complaints');
+    expect(api.lastData, {'complaintType': 'ORDER_SERVICE', 'content': '服务问题'});
+  });
+
   test('submitRating posts the star score and trimmed content', () async {
     final api = RecordingApiClient({
       'POST /orders/ORD-9/rating': {
@@ -245,32 +287,32 @@ void main() {
     expect(rating.createdAt, DateTime(2026, 8, 13, 12));
   });
 
-  test('submitRating omits blank content and rating query parses unrated', () async {
-    final api = RecordingApiClient({
-      'POST /orders/ORD-9/rating': {
-        'rated': true,
-        'rating': 3,
-      },
-      'GET /orders/ORD-9/rating': {
-        'rated': false,
-        'rating': null,
-        'content': null,
-        'createdAt': null,
-      },
-    });
-    final repository = PassengerOrderRepository(api);
+  test(
+    'submitRating omits blank content and rating query parses unrated',
+    () async {
+      final api = RecordingApiClient({
+        'POST /orders/ORD-9/rating': {'rated': true, 'rating': 3},
+        'GET /orders/ORD-9/rating': {
+          'rated': false,
+          'rating': null,
+          'content': null,
+          'createdAt': null,
+        },
+      });
+      final repository = PassengerOrderRepository(api);
 
-    await repository.submitRating('ORD-9', rating: 3, content: '   ');
-    final current = await repository.rating('ORD-9');
+      await repository.submitRating('ORD-9', rating: 3, content: '   ');
+      final current = await repository.rating('ORD-9');
 
-    expect(
-      (api.calls.first.data as Map<String, dynamic>).containsKey('content'),
-      isFalse,
-    );
-    expect(current.rated, isFalse);
-    expect(current.rating, isNull);
-    expect(current.content, isNull);
-  });
+      expect(
+        (api.calls.first.data as Map<String, dynamic>).containsKey('content'),
+        isFalse,
+      );
+      expect(current.rated, isFalse);
+      expect(current.rating, isNull);
+      expect(current.content, isNull);
+    },
+  );
 
   test('myRatings sends page/size and parses the history records', () async {
     final api = RecordingApiClient({

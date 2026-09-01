@@ -278,40 +278,57 @@ void main() {
     expect(route.points.first.coordinateSystem, CoordinateSystem.gcj02);
   });
 
-  test('order detail keeps the passenger phone tail for driver verification', () {
-    final detail = OrderDetail.fromJson({
-      'orderNo': 'O2',
-      'status': 'DRIVER_ARRIVED',
-      'pickupPoiId': null,
-      'pickupName': '起点',
-      'pickupAddress': null,
-      'pickupLat': '31.2304',
-      'pickupLng': '121.4737',
-      'destinationPoiId': null,
-      'destinationName': '终点',
-      'destinationAddress': null,
-      'destinationLat': '31.2400',
-      'destinationLng': '121.4800',
-      'estimatedDistanceM': 1200,
-      'estimatedDurationS': 600,
-      'billingDistanceM': 0,
-      'actualDurationS': null,
-      'waitingDurationS': null,
-      'fare': {
-        'baseFare': '5.00',
-        'distanceFare': '0.00',
-        'drivingTimeFare': '2.00',
-        'waitingFare': '0.00',
-        'totalFare': '7.00',
-      },
-      'estimatedFare': true,
-      'passengerPhoneTail': '1234',
-      'driver': null,
-      'events': [],
+  test('order models parse terminated status and settlement', () {
+    expect(orderStatusFromJson('TERMINATED'), OrderStatus.terminated);
+    expect(orderStatusToJson(OrderStatus.terminated), 'TERMINATED');
+    final result = OrderTerminationResult.fromJson({
+      'orderNo': 'O-TERM',
+      'status': 'TERMINATED',
+      'actualDurationS': 60,
+      'billingDistanceM': 100,
+      'totalFare': '8.20',
     });
-
-    expect(detail.passengerPhoneTail, '1234');
+    expect(result.status, OrderStatus.terminated);
+    expect(result.totalFare, '8.20');
   });
+
+  test(
+    'order detail keeps the passenger phone tail for driver verification',
+    () {
+      final detail = OrderDetail.fromJson({
+        'orderNo': 'O2',
+        'status': 'DRIVER_ARRIVED',
+        'pickupPoiId': null,
+        'pickupName': '起点',
+        'pickupAddress': null,
+        'pickupLat': '31.2304',
+        'pickupLng': '121.4737',
+        'destinationPoiId': null,
+        'destinationName': '终点',
+        'destinationAddress': null,
+        'destinationLat': '31.2400',
+        'destinationLng': '121.4800',
+        'estimatedDistanceM': 1200,
+        'estimatedDurationS': 600,
+        'billingDistanceM': 0,
+        'actualDurationS': null,
+        'waitingDurationS': null,
+        'fare': {
+          'baseFare': '5.00',
+          'distanceFare': '0.00',
+          'drivingTimeFare': '2.00',
+          'waitingFare': '0.00',
+          'totalFare': '7.00',
+        },
+        'estimatedFare': true,
+        'passengerPhoneTail': '1234',
+        'driver': null,
+        'events': [],
+      });
+
+      expect(detail.passengerPhoneTail, '1234');
+    },
+  );
 
   test('POI place serializes the native result for backend requests', () {
     const place = Place(
@@ -330,4 +347,3 @@ void main() {
     });
   });
 }
-

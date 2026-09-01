@@ -22,6 +22,7 @@ class _DriverOrdersHistoryPageState
     null,
     OrderStatus.completed,
     OrderStatus.cancelled,
+    OrderStatus.terminated,
   ];
 
   final _scrollController = ScrollController();
@@ -66,11 +67,13 @@ class _DriverOrdersHistoryPageState
       if (reset) _error = null;
     });
     try {
-      final page = await ref.read(driverRepositoryProvider).orders(
-        page: reset ? 1 : _page + 1,
-        size: _pageSize,
-        status: _status,
-      );
+      final page = await ref
+          .read(driverRepositoryProvider)
+          .orders(
+            page: reset ? 1 : _page + 1,
+            size: _pageSize,
+            status: _status,
+          );
       if (!mounted) return;
       setState(() {
         _records
@@ -95,11 +98,9 @@ class _DriverOrdersHistoryPageState
     if (_loading || _loadingMore || _records.length >= _total) return;
     setState(() => _loadingMore = true);
     try {
-      final page = await ref.read(driverRepositoryProvider).orders(
-        page: _page + 1,
-        size: _pageSize,
-        status: _status,
-      );
+      final page = await ref
+          .read(driverRepositoryProvider)
+          .orders(page: _page + 1, size: _pageSize, status: _status);
       if (!mounted) return;
       setState(() {
         _records.addAll(page.records);
@@ -205,18 +206,21 @@ String _filterLabel(OrderStatus? status) => switch (status) {
   null => '全部',
   OrderStatus.completed => '已完成',
   OrderStatus.cancelled => '已取消',
+  OrderStatus.terminated => '已结束',
   _ => '其他',
 };
 
 IconData _statusIcon(OrderStatus status) => switch (status) {
   OrderStatus.completed => Icons.check_circle_outline,
   OrderStatus.cancelled => Icons.cancel_outlined,
+  OrderStatus.terminated => Icons.stop_circle_outlined,
   _ => Icons.receipt_long_outlined,
 };
 
 String _statusLabel(OrderStatus status) => switch (status) {
   OrderStatus.completed => '已完成',
   OrderStatus.cancelled => '已取消',
+  OrderStatus.terminated => '已结束',
   _ => '进行中',
 };
 

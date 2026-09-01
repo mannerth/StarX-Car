@@ -276,11 +276,32 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
             label: const Text('开始服务'),
           ),
         ],
-        if (order.status == OrderStatus.inService)
+        if (order.status == OrderStatus.inService) ...[
           FilledButton.icon(
             onPressed: _busy ? null : () => _confirmComplete(order.orderNo),
             icon: const Icon(Icons.check_circle_outline),
             label: const Text('完成并结算'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : () => _confirmTerminate(order),
+            icon: const Icon(Icons.stop_circle_outlined),
+            label: const Text('中途结束行程'),
+          ),
+        ],
+        if (order.status == OrderStatus.accepted ||
+            order.status == OrderStatus.driverArrived)
+          OutlinedButton.icon(
+            onPressed: _busy ? null : () => _confirmCancel(order),
+            icon: const Icon(Icons.cancel_outlined),
+            label: const Text('取消订单'),
+          ),
+        if (order.status == OrderStatus.completed ||
+            order.status == OrderStatus.terminated)
+          OutlinedButton.icon(
+            onPressed: _busy ? null : () => _submitComplaint(order.orderNo),
+            icon: const Icon(Icons.report_problem_outlined),
+            label: const Text('发起投诉'),
           ),
       ],
     );
@@ -437,6 +458,151 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
       ref.invalidate(pendingOrdersProvider);
     } on ApiException catch (error) {
       if (mounted) _showMessage(error.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirmCancel(OrderDetail order) async {
+    final reason = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('取消订单'),
+        content: TextField(
+          controller: reason,
+          maxLength: 255,
+          decoration: const InputDecoration(labelText: '取消原因（可选）'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('保留订单'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确认取消'),
+          ),
+        ],
+      ),
+    );
+    final value = reason.text;
+    Future<void>.delayed(const Duration(milliseconds: 300), reason.dispose);
+    if (confirmed != true || !mounted) return;
+    await _run(
+      () => ref
+          .read(driverRepositoryProvider)
+          .cancelOrder(order.orderNo, reason: value),
+    );
+  }
+
+  Future<void> _submitComplaint(String orderNo) async {
+    final content = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('发起投诉'),
+        content: TextField(
+          controller: content,
+          maxLength: 1000,
+          maxLines: 4,
+          decoration: const InputDecoration(labelText: '请描述问题'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('提交'),
+          ),
+        ],
+      ),
+    );
+    final value = content.text.trim();
+    Future<void>.delayed(const Duration(milliseconds: 300), content.dispose);
+    if (confirmed != true || value.isEmpty || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(driverRepositoryProvider)
+          .createComplaint(
+            orderNo,
+            complaintType: 'ORDER_SERVICE',
+            content: value,
+          );
+      if (mounted) _showMessage('投诉已提交，我们会在七天内处理。');
+    } on ApiException {
+      if (mounted) _showMessage('投诉提交失败，请稍后重试。');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirmTerminate(OrderDetail order) async {
+    final detail = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('中途结束行程'),
+        content: TextField(
+          controller: detail,
+          maxLength: 500,
+          maxLines: 3,
+          decoration: const InputDecoration(labelText: '结束说明（可选）'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('继续行程'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确认结束'),
+          ),
+        ],
+      ),
+    );
+    final value = detail.text;
+    Future<void>.delayed(const Duration(milliseconds: 300), detail.dispose);
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final result = await ref
+          .read(driverRepositoryProvider)
+          .terminateOrder(
+            order.orderNo,
+            reasonCode: 'DRIVER_REQUEST',
+            reasonDetail: value,
+          );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('行程已结束'),
+          content: Text(
+            '实际里程：${result.billingDistanceM} 米\n'
+            '服务时长：${_minutes(result.actualDurationS)} 分钟\n'
+            '结算金额：¥${result.totalFare}',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('知道了'),
+            ),
+          ],
+        ),
+      );
+      ref.invalidate(driverOrderDetailProvider(order.orderNo));
+      ref.invalidate(driverOrdersProvider);
+      ref.invalidate(pendingOrdersProvider);
+    } on ApiException catch (error) {
+      if (mounted) {
+        _showMessage(
+          error.statusCode == 409 ? '当前无法结束行程，请先上报最新位置后重试。' : '行程结束失败，请稍后重试。',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -623,6 +789,7 @@ String _statusLabel(OrderStatus status) => switch (status) {
   OrderStatus.inService => '服务进行中',
   OrderStatus.completed => '已完成',
   OrderStatus.cancelled => '已取消',
+  OrderStatus.terminated => '已结束',
   OrderStatus.unknown => '状态更新中',
 };
 

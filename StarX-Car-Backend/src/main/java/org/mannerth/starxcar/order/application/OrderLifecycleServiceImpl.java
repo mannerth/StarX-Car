@@ -113,7 +113,7 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     @Transactional
     public OrderStatusTransitionResponse cancelByDriver(Long driverId, String orderNo, String reason) {
         RideOrder order = orderAccessService.requireDriverOrder(orderNo, driverId);
-        if (order.getStatus() != OrderStatus.ACCEPTED) {
+        if (order.getStatus() != OrderStatus.ACCEPTED && order.getStatus() != OrderStatus.DRIVER_ARRIVED) {
             throw conflict("订单当前不可取消");
         }
         return cancel(order, OrderOperatorType.driver, driverId, reason);

@@ -1,5 +1,6 @@
 ## Unreleased
 
+- 新增 `OrderStatus.terminated` 与 `OrderTerminationResult`，解析服务端中途结束订单的实际里程、时长和结算金额。
 - 新增 `WalletBalance` 与 `WalletApi`，封装跨角色的余额查询、充值和提现 HTTP 传输，不引入角色业务流程。
 
 - `OrderStatus` 新增 `scheduled`（`SCHEDULED`）；新增 `OrderType` 枚举（`instant`/`scheduled`/`unknown`）与 `orderTypeFromJson`/`orderTypeToJson`。`OrderSummary`/`OrderDetail` 新增 `orderType`、`scheduledPickupTime`，`OrderDetail` 另新增 `dispatchTime`，并各自提供 `isScheduled`；旧服务端缺少字段时解析为即时单，保持向后兼容。

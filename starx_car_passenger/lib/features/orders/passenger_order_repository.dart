@@ -102,6 +102,31 @@ class PassengerOrderRepository {
         : {'reason': reason.trim()},
   );
 
+  Future<void> createComplaint(
+    String orderNo, {
+    required String complaintType,
+    required String content,
+  }) async => _api.post(
+    '/orders/$orderNo/complaints',
+    data: {'complaintType': complaintType.trim(), 'content': content.trim()},
+  );
+
+  Future<OrderTerminationResult> terminate(
+    String orderNo, {
+    required String reasonCode,
+    String? reasonDetail,
+  }) async => OrderTerminationResult.fromJson(
+    await _api.post(
+          '/orders/$orderNo/terminate',
+          data: {
+            'reasonCode': reasonCode,
+            if (reasonDetail != null && reasonDetail.trim().isNotEmpty)
+              'reasonDetail': reasonDetail.trim(),
+          },
+        )
+        as Map<String, dynamic>,
+  );
+
   Future<DriverLocation> driverLocation(
     String orderNo, {
     CancelToken? cancelToken,
@@ -173,7 +198,6 @@ class OrderCreated {
     quote: OrderQuote.fromJson(json['quote'] as Map<String, dynamic>),
   );
 }
-
 
 /// A passenger's rating of the driver for one completed order.
 class OrderRating {

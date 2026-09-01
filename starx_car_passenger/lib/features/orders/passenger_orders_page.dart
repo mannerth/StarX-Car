@@ -98,140 +98,137 @@ class _PassengerApproachData {
 }
 
 final passengerApproachProvider = StreamProvider.autoDispose
-    .family<_PassengerApproachData, _ApproachRequest>(
-      (ref, request) async* {
-        ref.watch(passengerAuthProvider);
-        final repository = ref.read(passengerOrderRepositoryProvider);
-        final routeService = const AmapRouteService();
-        final cancelToken = CancelToken();
-        final locationService = AmapLocationService();
-        ref.onDispose(() {
-          cancelToken.cancel('approach provider disposed');
-          unawaited(locationService.dispose());
-        });
-        final pickup = GeoPoint(
-          latitude: request.pickupLat,
-          longitude: request.pickupLng,
-        );
-        GeoPoint? passengerLocation;
-        bool located = false;
-        bool locating = false;
-        GeoPoint? plannedDriverOrigin;
-        DateTime? plannedDriverAt;
-        AmapDrivingRoute? driverRoute;
-        String? driverRouteError;
-        GeoPoint? plannedWalkOrigin;
-        DateTime? plannedWalkAt;
-        AmapWalkingRoute? walkingRoute;
-        String? walkingRouteError;
-        String? locationError;
-        var failureCount = 0;
-        while (true) {
-          await _waitForForeground();
-          if (!located && !locating) {
-            locating = true;
-            try {
-              final update = await locationService.locateOnce();
-              if (update.point != null) {
-                passengerLocation = update.point;
-                locationError = null;
-              } else {
-                locationError =
-                    update.errorMessage ?? '无法获取当前位置，请检查定位权限和 GPS。';
-              }
-            } on Object {
-              locationError = '无法获取当前位置，请检查定位权限和 GPS。';
-            } finally {
-              locating = false;
-            }
-            located = true;
-          }
-          late final DriverLocation driverLocation;
+    .family<_PassengerApproachData, _ApproachRequest>((ref, request) async* {
+      ref.watch(passengerAuthProvider);
+      final repository = ref.read(passengerOrderRepositoryProvider);
+      final routeService = const AmapRouteService();
+      final cancelToken = CancelToken();
+      final locationService = AmapLocationService();
+      ref.onDispose(() {
+        cancelToken.cancel('approach provider disposed');
+        unawaited(locationService.dispose());
+      });
+      final pickup = GeoPoint(
+        latitude: request.pickupLat,
+        longitude: request.pickupLng,
+      );
+      GeoPoint? passengerLocation;
+      bool located = false;
+      bool locating = false;
+      GeoPoint? plannedDriverOrigin;
+      DateTime? plannedDriverAt;
+      AmapDrivingRoute? driverRoute;
+      String? driverRouteError;
+      GeoPoint? plannedWalkOrigin;
+      DateTime? plannedWalkAt;
+      AmapWalkingRoute? walkingRoute;
+      String? walkingRouteError;
+      String? locationError;
+      var failureCount = 0;
+      while (true) {
+        await _waitForForeground();
+        if (!located && !locating) {
+          locating = true;
           try {
-            driverLocation = await repository.driverLocation(
-              request.orderNo,
-              cancelToken: cancelToken,
-            );
-            failureCount = 0;
-          } on ApiException catch (error) {
-            if (error.cancelled) return;
-            if (error.statusCode == 404 || error.statusCode == 409) return;
-            failureCount++;
-            if (failureCount >= _maxPollingFailures) rethrow;
-            await _pollRetryDelay(failureCount);
-            continue;
+            final update = await locationService.locateOnce();
+            if (update.point != null) {
+              passengerLocation = update.point;
+              locationError = null;
+            } else {
+              locationError = update.errorMessage ?? '无法获取当前位置，请检查定位权限和 GPS。';
+            }
           } on Object {
-            failureCount++;
-            if (failureCount >= _maxPollingFailures) rethrow;
-            await _pollRetryDelay(failureCount);
-            continue;
+            locationError = '无法获取当前位置，请检查定位权限和 GPS。';
+          } finally {
+            locating = false;
           }
-          final now = DateTime.now();
-          final driverDistanceMoved = plannedDriverOrigin == null
-              ? double.infinity
-              : _distanceM(plannedDriverOrigin, driverLocation.point);
-          final driverSecondsSincePlan = plannedDriverAt == null
-              ? double.infinity
-              : now.difference(plannedDriverAt).inSeconds;
-          final shouldRefreshDriverRoute = driverRoute == null
-              ? plannedDriverAt == null || driverSecondsSincePlan >= 5
-              : driverDistanceMoved >= _approachDriverRefreshDistanceM ||
-                    driverSecondsSincePlan >= _approachDriverRefreshSeconds;
-          if (shouldRefreshDriverRoute) {
-            plannedDriverAt = now;
-            try {
-              driverRoute = await routeService.planDriving(
-                origin: driverLocation.point,
-                destination: pickup,
-              );
-              plannedDriverOrigin = driverLocation.point;
-              driverRouteError = null;
-            } on Object {
-              driverRouteError = '司机路线暂不可用';
-            }
-          }
-          final passengerPoint = passengerLocation;
-          final walkDistance = passengerPoint == null
-              ? double.infinity
-              : _distanceM(passengerPoint, pickup);
-          final nearPickup = passengerPoint != null && walkDistance < 50;
-          final walkSecondsSincePlan = plannedWalkAt == null
-              ? double.infinity
-              : now.difference(plannedWalkAt).inSeconds;
-          final walkMoved = passengerPoint == null ||
-              plannedWalkOrigin == null ||
-              _distanceM(plannedWalkOrigin, passengerPoint) >= 100;
-          final shouldRefreshWalkRoute = !nearPickup &&
-              (walkingRoute == null ||
-                  walkMoved ||
-                  walkSecondsSincePlan >= 120);
-          if (shouldRefreshWalkRoute && passengerPoint != null) {
-            plannedWalkAt = now;
-            try {
-              walkingRoute = await routeService.planWalking(
-                origin: passengerPoint,
-                destination: pickup,
-              );
-              plannedWalkOrigin = passengerPoint;
-              walkingRouteError = null;
-            } on Object {
-              walkingRouteError = '步行路线暂不可用';
-            }
-          }
-          yield _PassengerApproachData(
-            driverLocation: driverLocation,
-            passengerLocation: passengerPoint,
-            driverRoute: driverRoute,
-            walkingRoute: walkingRoute,
-            driverRouteError: driverRouteError,
-            walkingRouteError: walkingRouteError,
-            locationError: locationError,
-            nearPickup: nearPickup,
-          );
-          await Future<void>.delayed(_passengerLocationPollInterval);
+          located = true;
         }
-      },
-    );
+        late final DriverLocation driverLocation;
+        try {
+          driverLocation = await repository.driverLocation(
+            request.orderNo,
+            cancelToken: cancelToken,
+          );
+          failureCount = 0;
+        } on ApiException catch (error) {
+          if (error.cancelled) return;
+          if (error.statusCode == 404 || error.statusCode == 409) return;
+          failureCount++;
+          if (failureCount >= _maxPollingFailures) rethrow;
+          await _pollRetryDelay(failureCount);
+          continue;
+        } on Object {
+          failureCount++;
+          if (failureCount >= _maxPollingFailures) rethrow;
+          await _pollRetryDelay(failureCount);
+          continue;
+        }
+        final now = DateTime.now();
+        final driverDistanceMoved = plannedDriverOrigin == null
+            ? double.infinity
+            : _distanceM(plannedDriverOrigin, driverLocation.point);
+        final driverSecondsSincePlan = plannedDriverAt == null
+            ? double.infinity
+            : now.difference(plannedDriverAt).inSeconds;
+        final shouldRefreshDriverRoute = driverRoute == null
+            ? plannedDriverAt == null || driverSecondsSincePlan >= 5
+            : driverDistanceMoved >= _approachDriverRefreshDistanceM ||
+                  driverSecondsSincePlan >= _approachDriverRefreshSeconds;
+        if (shouldRefreshDriverRoute) {
+          plannedDriverAt = now;
+          try {
+            driverRoute = await routeService.planDriving(
+              origin: driverLocation.point,
+              destination: pickup,
+            );
+            plannedDriverOrigin = driverLocation.point;
+            driverRouteError = null;
+          } on Object {
+            driverRouteError = '司机路线暂不可用';
+          }
+        }
+        final passengerPoint = passengerLocation;
+        final walkDistance = passengerPoint == null
+            ? double.infinity
+            : _distanceM(passengerPoint, pickup);
+        final nearPickup = passengerPoint != null && walkDistance < 50;
+        final walkSecondsSincePlan = plannedWalkAt == null
+            ? double.infinity
+            : now.difference(plannedWalkAt).inSeconds;
+        final walkMoved =
+            passengerPoint == null ||
+            plannedWalkOrigin == null ||
+            _distanceM(plannedWalkOrigin, passengerPoint) >= 100;
+        final shouldRefreshWalkRoute =
+            !nearPickup &&
+            (walkingRoute == null || walkMoved || walkSecondsSincePlan >= 120);
+        if (shouldRefreshWalkRoute && passengerPoint != null) {
+          plannedWalkAt = now;
+          try {
+            walkingRoute = await routeService.planWalking(
+              origin: passengerPoint,
+              destination: pickup,
+            );
+            plannedWalkOrigin = passengerPoint;
+            walkingRouteError = null;
+          } on Object {
+            walkingRouteError = '步行路线暂不可用';
+          }
+        }
+        yield _PassengerApproachData(
+          driverLocation: driverLocation,
+          passengerLocation: passengerPoint,
+          driverRoute: driverRoute,
+          walkingRoute: walkingRoute,
+          driverRouteError: driverRouteError,
+          walkingRouteError: walkingRouteError,
+          locationError: locationError,
+          nearPickup: nearPickup,
+        );
+        await Future<void>.delayed(_passengerLocationPollInterval);
+      }
+    });
 
 final passengerRouteContextProvider = FutureProvider.autoDispose
     .family<RouteContext, String>((ref, orderNo) {
@@ -337,6 +334,7 @@ const _orderStatusFilters = <OrderStatus?>[
   OrderStatus.inService,
   OrderStatus.completed,
   OrderStatus.cancelled,
+  OrderStatus.terminated,
 ];
 
 class PassengerOrdersPage extends ConsumerStatefulWidget {
@@ -576,7 +574,8 @@ class _OrderDetailContent extends ConsumerWidget {
     final canCancel =
         order.status == OrderStatus.scheduled ||
         order.status == OrderStatus.pending ||
-        order.status == OrderStatus.accepted;
+        order.status == OrderStatus.accepted ||
+        order.status == OrderStatus.driverArrived;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -641,9 +640,21 @@ class _OrderDetailContent extends ConsumerWidget {
           emphasized: true,
         ),
 
+        if (order.status == OrderStatus.inService) ...[
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: () => _confirmTerminate(context, ref),
+            icon: const Icon(Icons.stop_circle_outlined),
+            label: const Text('中途结束行程'),
+          ),
+        ],
         if (order.status == OrderStatus.completed) ...[
           const Divider(height: 32),
           _RatingPanel(orderNo: order.orderNo),
+        ],
+        if (_isComplaintEligible(order.status)) ...[
+          const Divider(height: 32),
+          _ComplaintButton(orderNo: order.orderNo),
         ],
         if (order.events.isNotEmpty) ...[
           const Divider(height: 32),
@@ -704,6 +715,74 @@ class _OrderDetailContent extends ConsumerWidget {
       }
     }
   }
+
+  Future<void> _confirmTerminate(BuildContext context, WidgetRef ref) async {
+    final detail = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('中途结束行程'),
+        content: TextField(
+          controller: detail,
+          maxLength: 500,
+          maxLines: 3,
+          decoration: const InputDecoration(labelText: '结束说明（可选）'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('继续行程'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确认结束'),
+          ),
+        ],
+      ),
+    );
+    final value = detail.text;
+    Future<void>.delayed(const Duration(milliseconds: 300), detail.dispose);
+    if (confirmed != true || !context.mounted) return;
+    try {
+      final result = await ref
+          .read(passengerOrderRepositoryProvider)
+          .terminate(
+            order.orderNo,
+            reasonCode: 'PASSENGER_REQUEST',
+            reasonDetail: value,
+          );
+      ref.invalidate(passengerOrdersProvider);
+      ref.invalidate(passengerOrderDetailProvider(order.orderNo));
+      if (context.mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('行程已结束'),
+            content: Text(
+              '实际里程：${result.billingDistanceM} 米\n'
+              '服务时长：${_minutes(result.actualDurationS)} 分钟\n'
+              '结算金额：¥${result.totalFare}',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('知道了'),
+              ),
+            ],
+          ),
+        );
+      }
+    } on ApiException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_terminationError(error))));
+      }
+    }
+  }
+
+  String _terminationError(ApiException error) =>
+      error.statusCode == 409 ? '当前无法结束行程，请确认司机位置已更新后重试。' : '行程结束失败，请稍后重试。';
 }
 
 class _ApproachPanel extends ConsumerWidget {
@@ -733,7 +812,8 @@ class _ApproachPanel extends ConsumerWidget {
         children: [
           Text(error is ApiException ? error.message : '接驾信息暂不可用，请稍后重试'),
           OutlinedButton.icon(
-            onPressed: () => ref.invalidate(passengerApproachProvider(_request)),
+            onPressed: () =>
+                ref.invalidate(passengerApproachProvider(_request)),
             icon: const Icon(Icons.refresh),
             label: const Text('重试'),
           ),
@@ -990,6 +1070,7 @@ IconData _statusIcon(OrderStatus status) => switch (status) {
   OrderStatus.inService => Icons.directions_car,
   OrderStatus.completed => Icons.check_circle_outline,
   OrderStatus.cancelled => Icons.cancel_outlined,
+  OrderStatus.terminated => Icons.stop_circle_outlined,
   OrderStatus.unknown => Icons.help_outline,
 };
 
@@ -1001,6 +1082,7 @@ String _statusLabel(OrderStatus status) => switch (status) {
   OrderStatus.inService => '行程中',
   OrderStatus.completed => '已完成',
   OrderStatus.cancelled => '已取消',
+  OrderStatus.terminated => '已结束',
   OrderStatus.unknown => '状态更新中',
 };
 
@@ -1014,6 +1096,7 @@ String _filterLabel(OrderStatus? status) => status == null
         OrderStatus.inService => '行程中',
         OrderStatus.completed => '已完成',
         OrderStatus.cancelled => '已取消',
+        OrderStatus.terminated => '已结束',
         OrderStatus.unknown => '状态更新中',
       };
 
@@ -1025,7 +1108,12 @@ String _formatTime(DateTime time) {
 int _minutes(int seconds) => (seconds / 60).ceil();
 
 bool _isTerminalOrderStatus(OrderStatus status) =>
-    status == OrderStatus.completed || status == OrderStatus.cancelled;
+    status == OrderStatus.completed ||
+    status == OrderStatus.cancelled ||
+    status == OrderStatus.terminated;
+
+bool _isComplaintEligible(OrderStatus status) =>
+    status == OrderStatus.completed || status == OrderStatus.terminated;
 
 const _maxPollingFailures = 3;
 
@@ -1070,7 +1158,6 @@ Future<void> _waitForForeground() async {
 bool get _isForeground =>
     WidgetsBinding.instance.lifecycleState == null ||
     WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
-
 
 /// 已完成订单的评价区：已评价时只读展示，未评价时提供 1-5 星与可选文字输入。
 class _RatingPanel extends ConsumerStatefulWidget {
@@ -1189,6 +1276,77 @@ class _RatingDisplay extends StatelessWidget {
   );
 }
 
+class _ComplaintButton extends ConsumerStatefulWidget {
+  const _ComplaintButton({required this.orderNo});
+  final String orderNo;
+
+  @override
+  ConsumerState<_ComplaintButton> createState() => _ComplaintButtonState();
+}
+
+class _ComplaintButtonState extends ConsumerState<_ComplaintButton> {
+  bool _submitting = false;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    onPressed: _submitting ? null : _submit,
+    icon: const Icon(Icons.report_problem_outlined),
+    label: Text(_submitting ? '提交中…' : '发起投诉'),
+  );
+
+  Future<void> _submit() async {
+    final content = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('发起投诉'),
+        content: TextField(
+          controller: content,
+          maxLength: 1000,
+          maxLines: 4,
+          decoration: const InputDecoration(labelText: '请描述问题'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('提交'),
+          ),
+        ],
+      ),
+    );
+    final value = content.text.trim();
+    Future<void>.delayed(const Duration(milliseconds: 300), content.dispose);
+    if (confirmed != true || value.isEmpty || !mounted) return;
+    setState(() => _submitting = true);
+    try {
+      await ref
+          .read(passengerOrderRepositoryProvider)
+          .createComplaint(
+            widget.orderNo,
+            complaintType: 'ORDER_SERVICE',
+            content: value,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('投诉已提交，我们会在七天内处理')));
+      }
+    } on ApiException {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('投诉提交失败，请稍后重试')));
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+}
+
 class _RatingEditor extends StatelessWidget {
   const _RatingEditor({
     required this.score,
@@ -1282,7 +1440,6 @@ class _StarRow extends StatelessWidget {
 String _formatRatingTime(DateTime value) =>
     value.toLocal().toString().replaceFirst('T', ' ').split('.').first;
 
-
 /// 已接单司机的信息卡：评分、脱敏手机号、车牌、车辆信息与联系司机按钮。
 class _DriverInfoCard extends StatelessWidget {
   const _DriverInfoCard({required this.driver});
@@ -1302,7 +1459,11 @@ class _DriverInfoCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text('接单司机', style: Theme.of(context).textTheme.titleMedium),
               const Spacer(),
-              _StarRow(score: driver.rating?.round() ?? 0, size: 16, onChanged: null),
+              _StarRow(
+                score: driver.rating?.round() ?? 0,
+                size: 16,
+                onChanged: null,
+              ),
               const SizedBox(width: 4),
               Text(
                 driver.rating == null
@@ -1332,8 +1493,9 @@ class _DriverInfoCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed:
-                  driver.phoneNumber?.isNotEmpty == true ? () => _callDriver(context) : null,
+              onPressed: driver.phoneNumber?.isNotEmpty == true
+                  ? () => _callDriver(context)
+                  : null,
               icon: const Icon(Icons.call),
               label: const Text('联系司机'),
             ),
@@ -1368,9 +1530,9 @@ class _DriverInfoCard extends StatelessWidget {
   }
 
   void _showMessage(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -1396,9 +1558,7 @@ class _DriverInfoRow extends StatelessWidget {
           width: 64,
           child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
         ),
-        Expanded(
-          child: Text(value, textAlign: TextAlign.end),
-        ),
+        Expanded(child: Text(value, textAlign: TextAlign.end)),
       ],
     ),
   );

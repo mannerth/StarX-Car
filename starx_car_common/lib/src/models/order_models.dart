@@ -11,6 +11,7 @@ enum OrderStatus {
   inService,
   completed,
   cancelled,
+  terminated,
   unknown,
 }
 
@@ -30,6 +31,8 @@ OrderStatus orderStatusFromJson(Object? value) {
       return OrderStatus.completed;
     case 'CANCELLED':
       return OrderStatus.cancelled;
+    case 'TERMINATED':
+      return OrderStatus.terminated;
     default:
       return OrderStatus.unknown;
   }
@@ -51,6 +54,8 @@ String orderStatusToJson(OrderStatus value) {
       return 'COMPLETED';
     case OrderStatus.cancelled:
       return 'CANCELLED';
+    case OrderStatus.terminated:
+      return 'TERMINATED';
     case OrderStatus.unknown:
       throw StateError('未知订单状态不能用于请求筛选。');
   }
@@ -58,11 +63,7 @@ String orderStatusToJson(OrderStatus value) {
 
 /// Order kinds returned by the backend. [unknown] keeps older clients readable
 /// when a server adds a new kind.
-enum OrderType {
-  instant,
-  scheduled,
-  unknown,
-}
+enum OrderType { instant, scheduled, unknown }
 
 OrderType orderTypeFromJson(Object? value) {
   switch (value?.toString()) {
@@ -487,4 +488,31 @@ class OrderCompletionResult {
       );
 }
 
+/// Server-side settlement returned when either party ends an IN_SERVICE order.
+class OrderTerminationResult {
+  const OrderTerminationResult({
+    required this.orderNo,
+    required this.status,
+    required this.endedTime,
+    required this.actualDurationS,
+    required this.billingDistanceM,
+    required this.totalFare,
+  });
 
+  final String orderNo;
+  final OrderStatus status;
+  final DateTime? endedTime;
+  final int actualDurationS;
+  final int billingDistanceM;
+  final String totalFare;
+
+  factory OrderTerminationResult.fromJson(Map<String, dynamic> json) =>
+      OrderTerminationResult(
+        orderNo: json['orderNo'] as String,
+        status: orderStatusFromJson(json['status']),
+        endedTime: _dateTime(json['endedTime']),
+        actualDurationS: (json['actualDurationS'] as num?)?.toInt() ?? 0,
+        billingDistanceM: (json['billingDistanceM'] as num?)?.toInt() ?? 0,
+        totalFare: _decimal(json['totalFare']),
+      );
+}

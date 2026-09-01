@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 新增司机历史订单 `TERMINATED` 筛选及完成/终止订单七天内投诉入口；投诉失败只显示固定业务提示，不暴露服务端原始错误。
+- 新增司机订单结束流程：司机可在 `ACCEPTED`/`DRIVER_ARRIVED` 取消订单，在 `IN_SERVICE` 发起中途结束；客户端提交结束原因并展示服务端实际里程、服务时长和结算金额，终止后刷新订单列表。
 - 修复待抢订单抢单按钮在全局 `FilledButton` 最小宽度为无限时触发 `BoxConstraints forces an infinite width` 的渲染异常；按钮现在使用有限宽度和局部最小尺寸，兼容订单卡片的横向布局。
 
 - 修复待抢订单卡片在长地址或窄屏下触发 `RenderBox was not laid out` 的布局异常：移除带复杂标题行和 trailing 按钮的 `ListTile` 组合，改为显式约束的左右布局，地址文本最多显示两行并稳定省略。

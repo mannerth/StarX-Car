@@ -119,6 +119,43 @@ void main() {
     expect(api.lastPath, 'DELETE /drivers/me');
   });
 
+  test('terminate posts reason and parses server settlement', () async {
+    final api = RecordingApiClient({
+      'POST /orders/ORD-6/terminate': {
+        'orderNo': 'ORD-6',
+        'status': 'TERMINATED',
+        'endedTime': '2026-08-06 12:10:00',
+        'actualDurationS': 600,
+        'billingDistanceM': 1200,
+        'totalFare': '12.50',
+      },
+    });
+    final result = await DriverRepository(api).terminateOrder(
+      'ORD-6',
+      reasonCode: 'DRIVER_REQUEST',
+      reasonDetail: '临时结束',
+    );
+    expect(api.lastData, {
+      'reasonCode': 'DRIVER_REQUEST',
+      'reasonDetail': '临时结束',
+    });
+    expect(result.status, OrderStatus.terminated);
+    expect(result.totalFare, '12.50');
+  });
+
+  test('complaint posts trimmed type and content', () async {
+    final api = RecordingApiClient({});
+
+    await DriverRepository(api).createComplaint(
+      'ORD-6',
+      complaintType: ' ORDER_SERVICE ',
+      content: ' 服务问题 ',
+    );
+
+    expect(api.lastPath, 'POST /orders/ORD-6/complaints');
+    expect(api.lastData, {'complaintType': 'ORDER_SERVICE', 'content': '服务问题'});
+  });
+
   test('order detail forwards its cancellation token', () async {
     final api = RecordingApiClient({'GET /orders/ORD-5': _orderDetail()});
     final cancelToken = CancelToken();

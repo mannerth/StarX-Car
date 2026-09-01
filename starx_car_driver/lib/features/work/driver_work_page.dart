@@ -13,34 +13,42 @@ class DriverWorkPage extends ConsumerWidget {
     final work = ref.watch(driverWorkProvider);
     final pending = ref.watch(pendingOrdersProvider);
     final orders = ref.watch(driverOrdersProvider);
-    final locationError = ref.watch(driverLocationErrorProvider);
     final online = work.value ?? false;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Card(
-          color: online ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerHighest,
+          color: online
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
           child: SwitchListTile.adaptive(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-            secondary: Icon(online ? Icons.wifi_tethering : Icons.power_settings_new),
-            title: Text(online ? '正在听单' : '已收车', style: const TextStyle(fontWeight: FontWeight.w700)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 8,
+            ),
+            secondary: Icon(
+              online ? Icons.wifi_tethering : Icons.power_settings_new,
+            ),
+            title: Text(
+              online ? '正在听单' : '已收车',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
             subtitle: Text(online ? '位置上报与待抢订单刷新已开启' : '上线前请确认当前车辆和定位权限'),
             value: online,
-            onChanged: work.isLoading ? null : (value) => ref.read(driverWorkProvider.notifier).setOnline(value),
+            onChanged: work.isLoading
+                ? null
+                : (value) =>
+                      ref.read(driverWorkProvider.notifier).setOnline(value),
           ),
         ),
-        if (work.hasError)
-          Text(
-            work.error is ApiException
-                ? (work.error as ApiException).message
-                : '工作状态加载失败',
-          ),
-        if (locationError != null) ...[
-          const SizedBox(height: 8),
-          Text(locationError, style: TextStyle(color: Colors.orange.shade800)),
-        ],
+        if (work.hasError) const Text('工作状态暂时不可用，请稍后重试。'),
         const SizedBox(height: 24),
-        Text('待抢订单', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          '待抢订单',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 4),
         Text('根据当前位置实时刷新', style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 8),
@@ -49,8 +57,8 @@ class DriverWorkPage extends ConsumerWidget {
         else
           pending.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => _InlineLoadError(
-              message: error is ApiException ? error.message : '待抢订单加载失败',
+            error: (_, _) => _InlineLoadError(
+              message: '待抢订单加载失败，请稍后重试。',
               onRetry: () => ref.invalidate(pendingOrdersProvider),
             ),
             data: (page) => page.records.isEmpty
@@ -63,15 +71,20 @@ class DriverWorkPage extends ConsumerWidget {
                   ),
           ),
         const SizedBox(height: 28),
-        Text('我的进行中订单', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          '我的进行中订单',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 8),
         orders.when(
           loading: () => const Padding(
             padding: EdgeInsets.all(12),
             child: CircularProgressIndicator(),
           ),
-          error: (error, _) => _InlineLoadError(
-            message: error is ApiException ? error.message : '订单加载失败',
+          error: (_, _) => _InlineLoadError(
+            message: '进行中订单加载失败，请稍后重试。',
             onRetry: () => ref.invalidate(driverOrdersProvider),
           ),
           data: (page) {
@@ -152,86 +165,114 @@ class _PendingOrderTileState extends ConsumerState<_PendingOrderTile> {
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
-    final scheduled =
-        order.isScheduled && order.scheduledPickupTime != null;
+    final scheduled = order.isScheduled && order.scheduledPickupTime != null;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
-        title: Row(
-        children: [
-          if (scheduled) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Text(
-                '预约',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: Colors.blue.shade700),
-              ),
-            ),
-            const SizedBox(width: 6),
-          ],
-          Expanded(
-            child: Text(
-              '${order.pickupName} -> ${order.destinationName}',
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-        subtitle: Text(
-        scheduled
-            ? '预约 ${_formatTime(order.scheduledPickupTime!)} 上车 · 预估 ¥${order.totalFare}'
-            : '预估 ¥${order.totalFare}',
-      ),
-        trailing: FilledButton(
-        onPressed: _loading
-            ? null
-            : () async {
-                final confirmed = await _confirmWorkAction(context, '抢单');
-                if (!confirmed || !context.mounted) return;
-                final navigator = Navigator.of(context);
-                final messenger = ScaffoldMessenger.of(context);
-                setState(() => _loading = true);
-                try {
-                  await ref
-                      .read(driverRepositoryProvider)
-                      .acceptOrder(widget.order.orderNo);
-                  ref.invalidate(pendingOrdersProvider);
-                  ref.invalidate(driverOrdersProvider);
-                  if (mounted && navigator.mounted) {
-                    await navigator.push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => DriverOrderDetailPage(
-                          orderNo: widget.order.orderNo,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      if (scheduled) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Text(
+                            '预约',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(color: Colors.blue.shade700),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Expanded(
+                        child: Text(
+                          '${order.pickupName} -> ${order.destinationName}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    );
-                  }
-                } on ApiException catch (error) {
-                  if (mounted && messenger.mounted) {
-                    messenger.showSnackBar(
-                      SnackBar(content: Text(error.message)),
-                    );
-                  }
-                } finally {
-                  if (mounted) setState(() => _loading = false);
-                }
-              },
-        child: _loading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Text('抢单'),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    scheduled
+                        ? '预约 ${_formatTime(order.scheduledPickupTime!)} 上车 · 预估 ¥${order.totalFare}'
+                        : '预估 ¥${order.totalFare}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 76,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(76, 50),
+                  padding: EdgeInsets.zero,
+                ),
+                onPressed: _loading
+                    ? null
+                    : () async {
+                        final confirmed = await _confirmWorkAction(
+                          context,
+                          '抢单',
+                        );
+                        if (!confirmed || !context.mounted) return;
+                        final navigator = Navigator.of(context);
+                        final messenger = ScaffoldMessenger.of(context);
+                        setState(() => _loading = true);
+                        try {
+                          await ref
+                              .read(driverRepositoryProvider)
+                              .acceptOrder(widget.order.orderNo);
+                          ref.invalidate(pendingOrdersProvider);
+                          ref.invalidate(driverOrdersProvider);
+                          if (mounted && navigator.mounted) {
+                            await navigator.push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => DriverOrderDetailPage(
+                                  orderNo: widget.order.orderNo,
+                                ),
+                              ),
+                            );
+                          }
+                        } on ApiException {
+                          if (mounted && messenger.mounted) {
+                            messenger.showSnackBar(
+                              const SnackBar(content: Text('抢单失败，请刷新订单后重试。')),
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => _loading = false);
+                        }
+                      },
+                child: _loading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('抢单'),
+              ),
+            ),
+          ],
         ),
       ),
     );

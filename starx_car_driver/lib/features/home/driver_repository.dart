@@ -13,7 +13,8 @@ class DriverRepository {
   final ApiClient _api;
   Future<WalletBalance> walletBalance() => WalletApi(_api).balance();
 
-  Future<WalletBalance> withdraw(double amount) => WalletApi(_api).withdraw(amount);
+  Future<WalletBalance> withdraw(double amount) =>
+      WalletApi(_api).withdraw(amount);
   Future<UserProfile> getUser() async =>
       UserProfile.fromJson(await _api.get('/users/me') as Map<String, dynamic>);
   Future<Map<String, dynamic>> getDriver() async =>
@@ -53,6 +54,9 @@ class DriverRepository {
     if (point.coordinateSystem != CoordinateSystem.gcj02) {
       throw StateError('司机位置上报必须使用 GCJ-02 坐标。');
     }
+    final apiAccuracyM = _apiOptionalDecimal(accuracyM, min: 0, max: 10000);
+    final apiSpeedMps = _apiOptionalDecimal(speedMps, min: 0, max: 100);
+    final apiBearing = _apiOptionalDecimal(bearing, min: 0, max: 360);
     await _api.put(
       '/drivers/me/location',
       data: {
@@ -60,9 +64,9 @@ class DriverRepository {
         // fractional digits. AMap may return more precision on some devices.
         'latitude': _apiCoordinate(point.latitude),
         'longitude': _apiCoordinate(point.longitude),
-        ...?accuracyM == null ? null : {'accuracyM': accuracyM},
-        ...?speedMps == null ? null : {'speedMps': speedMps},
-        ...?bearing == null ? null : {'bearing': bearing},
+        ...?apiAccuracyM == null ? null : {'accuracyM': apiAccuracyM},
+        ...?apiSpeedMps == null ? null : {'speedMps': apiSpeedMps},
+        ...?apiBearing == null ? null : {'bearing': apiBearing},
         'recordedTime': _formatBackendTime(recordedTime),
       },
       cancelToken: cancelToken,
@@ -183,6 +187,17 @@ class DriverRepository {
 }
 
 double _apiCoordinate(double value) => double.parse(value.toStringAsFixed(6));
+
+double? _apiOptionalDecimal(
+  double? value, {
+  required double min,
+  required double max,
+}) {
+  if (value == null || !value.isFinite || value < min || value > max) {
+    return null;
+  }
+  return double.parse(value.toStringAsFixed(2));
+}
 
 String _formatBackendTime(DateTime value) {
   final local = value.toLocal();

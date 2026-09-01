@@ -26,18 +26,18 @@ void main() {
     await repository.reportLocation(
       point: const GeoPoint(latitude: 31.23456789, longitude: 121.45678912),
       recordedTime: recorded,
-      accuracyM: 4.5,
-      speedMps: 2.1,
-      bearing: 90,
+      accuracyM: 4.567,
+      speedMps: 2.126,
+      bearing: 359.999,
     );
 
     expect(api.lastPath, 'PUT /drivers/me/location');
     expect(api.lastData, {
       'latitude': 31.234568,
       'longitude': 121.456789,
-      'accuracyM': 4.5,
-      'speedMps': 2.1,
-      'bearing': 90,
+      'accuracyM': 4.57,
+      'speedMps': 2.13,
+      'bearing': 360.0,
       'recordedTime': '2026-08-06 12:03:04',
     });
 
@@ -45,9 +45,17 @@ void main() {
     await repository.reportLocation(
       point: const GeoPoint(latitude: 31.2, longitude: 121.4),
       recordedTime: recorded,
+      accuracyM: double.nan,
+      speedMps: -1,
+      bearing: 361,
       cancelToken: cancelToken,
     );
     expect(api.calls.last.cancelToken, same(cancelToken));
+    expect(api.calls.last.data, {
+      'latitude': 31.2,
+      'longitude': 121.4,
+      'recordedTime': '2026-08-06 12:03:04',
+    });
 
     await expectLater(
       repository.reportLocation(

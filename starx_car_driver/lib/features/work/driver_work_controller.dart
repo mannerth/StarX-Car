@@ -11,16 +11,6 @@ final driverWorkProvider = AsyncNotifierProvider<DriverWorkController, bool>(
   DriverWorkController.new,
 );
 
-final driverLocationErrorProvider =
-    NotifierProvider<DriverLocationErrorController, String?>(
-      DriverLocationErrorController.new,
-    );
-
-class DriverLocationErrorController extends Notifier<String?> {
-  @override
-  String? build() => null;
-}
-
 class DriverWorkController extends AsyncNotifier<bool> {
   static const _foregroundChannel = MethodChannel(
     'starx_car_driver/foreground',
@@ -88,10 +78,12 @@ class DriverWorkController extends AsyncNotifier<bool> {
     _ensureLifecycleListener();
     _location ??= AmapLocationService();
     final cancelToken = _locationCancelToken ??= CancelToken();
-    _setLocationError(null);
     _locationSubscription ??= _location!.updates.listen((update) {
       if (update.point == null) {
-        _setLocationError(update.errorMessage ?? '无法获取当前位置，请检查定位权限和 GPS。');
+        debugPrint(
+          'Driver location unavailable: '
+          '${update.errorMessage ?? 'unknown location error'}',
+        );
         return;
       }
       _pendingLocation = update;
@@ -99,17 +91,19 @@ class DriverWorkController extends AsyncNotifier<bool> {
     });
     // 2 秒上报一次最新位置，配合乘客端 2 秒轮询，保证行程中司机位置更新及时。
     _location!.start(interval: const Duration(seconds: 2));
-    _pendingTimer ??= Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => ref.invalidate(pendingOrdersProvider),
-    );
+    _pendingTimer ??= Timer.periodic(const Duration(seconds: 5), (_) {
+      if (shouldStartOrderRefresh(ref.read(pendingOrdersProvider))) {
+        ref.invalidate(pendingOrdersProvider);
+      }
+    });
     // A passenger can cancel after the driver accepts the order. Keep the
     // active-order list in sync with that server-side transition as well as
     // the pending-order list, so the workbench recovers without re-entering.
-    _driverOrdersTimer ??= Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => ref.invalidate(driverOrdersProvider),
-    );
+    _driverOrdersTimer ??= Timer.periodic(const Duration(seconds: 5), (_) {
+      if (shouldStartOrderRefresh(ref.read(driverOrdersProvider))) {
+        ref.invalidate(driverOrdersProvider);
+      }
+    });
   }
 
   void _disposeTasks() {
@@ -206,16 +200,13 @@ class DriverWorkController extends AsyncNotifier<bool> {
       _locationFailureCount = 0;
       _locationRetryTimer?.cancel();
       _locationRetryTimer = null;
-      _setLocationError(null);
     } on Object catch (error) {
       if (error is ApiException && error.cancelled) return;
       // Keep the newest callback if one arrived while this request was in
       // flight; otherwise retry the failed point once connectivity returns.
       _pendingLocation ??= update;
       _locationFailureCount++;
-      _setLocationError(
-        error is ApiException ? error.message : '位置上报失败，将自动重试。',
-      );
+      debugPrint('Driver location report failed; retrying: $error');
       _scheduleLocationRetry(repo, cancelToken);
     } finally {
       _sendingLocation = false;
@@ -236,11 +227,10 @@ class DriverWorkController extends AsyncNotifier<bool> {
       unawaited(_drainLocationQueue(repo, cancelToken));
     });
   }
-
-  void _setLocationError(String? message) {
-    ref.read(driverLocationErrorProvider.notifier).state = message;
-  }
 }
+
+@visibleForTesting
+bool shouldStartOrderRefresh(AsyncValue<OrderPage> state) => !state.isLoading;
 
 final pendingOrdersProvider = FutureProvider.autoDispose<OrderPage>((ref) {
   ref.watch(driverAuthProvider);

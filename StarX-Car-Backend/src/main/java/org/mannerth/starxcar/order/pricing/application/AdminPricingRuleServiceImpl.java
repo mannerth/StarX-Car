@@ -119,11 +119,27 @@ public class AdminPricingRuleServiceImpl implements AdminPricingRuleService {
     @Transactional
     public PricingRuleResponse activate(Long adminId, Long ruleId, PricingRuleActivationRequest request) {
         PricingRule rule = requireForUpdate(ruleId);
+        boolean setAsDefault = request != null && request.shouldSetAsDefault();
+        if (rule.getStatus() == PricingRuleStatus.active) {
+            if (Boolean.TRUE.equals(rule.getDefaultRule())) {
+                throw conflict("该规则已是当前默认规则");
+            }
+            if (!setAsDefault) {
+                throw conflict("已启用规则只能设为默认规则");
+            }
+            ruleMapper.lockActiveDefaultRuleIds();
+            ruleMapper.deactivateOtherDefaultRules(ruleId, adminId);
+            if (ruleMapper.makeActiveRuleDefault(ruleId, adminId) != 1) {
+                throw conflict("计价规则状态已变化");
+            }
+            rule.setDefaultRule(true);
+            rule.setUpdatedBy(adminId);
+            return response(rule);
+        }
         if (rule.getStatus() != PricingRuleStatus.draft) {
-            throw conflict("仅草稿规则可激活");
+            throw conflict("仅草稿规则可激活或已启用规则可设为默认");
         }
         validatePersistedRule(rule, tiersFor(ruleId));
-        boolean setAsDefault = request != null && request.shouldSetAsDefault();
         if (setAsDefault) {
             ruleMapper.lockActiveDefaultRuleIds();
             ruleMapper.deactivateOtherDefaultRules(ruleId, adminId);

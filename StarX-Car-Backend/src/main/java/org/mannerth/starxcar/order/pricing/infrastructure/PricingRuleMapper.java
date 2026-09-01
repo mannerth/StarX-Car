@@ -34,6 +34,10 @@ public interface PricingRuleMapper extends BaseMapper<PricingRule> {
     int activateDraftRule(@Param("ruleId") Long ruleId, @Param("updatedBy") Long updatedBy,
                            @Param("defaultRule") boolean defaultRule);
 
+    @Update("UPDATE pricing_rule SET is_default = 1, updated_by = #{updatedBy} "
+            + "WHERE id = #{ruleId} AND status = 'active' AND is_default = 0")
+    int makeActiveRuleDefault(@Param("ruleId") Long ruleId, @Param("updatedBy") Long updatedBy);
+
     @Update("UPDATE pricing_rule SET status = 'archived', is_default = 0, updated_by = #{updatedBy} "
             + "WHERE id = #{ruleId} AND is_default = 0 AND status <> 'archived'")
     int archiveNonDefaultRule(@Param("ruleId") Long ruleId, @Param("updatedBy") Long updatedBy);

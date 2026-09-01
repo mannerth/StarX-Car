@@ -16,8 +16,27 @@ class PassengerApp extends ConsumerWidget {
       title: 'StarX-Car 乘客端',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF0B7A5C),
+          brightness: Brightness.light,
+        ),
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF7F9F8),
+        appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
+        cardTheme: const CardThemeData(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+        ),
+        inputDecorationTheme: const InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide.none),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50), shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(14)))),
+        ),
+        navigationBarTheme: const NavigationBarThemeData(height: 68, labelBehavior: NavigationDestinationLabelBehavior.alwaysShow),
       ),
       home: const _SessionGate(),
     );

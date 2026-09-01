@@ -88,8 +88,8 @@ public class AdminPricingRuleController {
     }
 
     @PostMapping("/{ruleId}/activate")
-    @Operation(summary = "激活计价规则", description = "仅限状态为 active 的 admin；仅完整有效的 draft 可激活。setAsDefault=true 时在同一事务中撤销其它活动默认规则后设置当前规则为唯一默认规则，历史订单不受影响。")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "激活成功"), @ApiResponse(responseCode = "401", description = "未登录"), @ApiResponse(responseCode = "403", description = "非管理员或账号不可用"), @ApiResponse(responseCode = "404", description = "规则不存在"), @ApiResponse(responseCode = "409", description = "规则不是草稿、草稿无效或发生并发状态变化")})
+    @Operation(summary = "激活或设为默认计价规则", description = "仅限状态为 active 的 admin；完整有效的 draft 可激活，已启用的非默认规则可通过 setAsDefault=true 提升为新订单唯一默认规则。切换在同一事务内停用旧默认规则，不影响历史订单。")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "规则状态更新成功"), @ApiResponse(responseCode = "401", description = "未登录"), @ApiResponse(responseCode = "403", description = "非管理员或账号不可用"), @ApiResponse(responseCode = "404", description = "规则不存在"), @ApiResponse(responseCode = "409", description = "规则状态不允许该操作、草稿无效或发生并发状态变化")})
     public PricingRuleResponse activate(@AuthenticationPrincipal String principal, @PathVariable Long ruleId,
                                         @RequestBody(required = false) PricingRuleActivationRequest request) {
         return pricingRuleService.activate(requireActiveAdmin(principal), ruleId, request);

@@ -18,14 +18,16 @@ class DriverWorkPage extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        SwitchListTile.adaptive(
-          title: Text(online ? '正在听单' : '已收车'),
-          subtitle: Text(online ? '位置上报与待抢订单刷新已开启' : '上线前请确认当前车辆和定位权限'),
-          value: online,
-          onChanged: work.isLoading
-              ? null
-              : (value) =>
-                    ref.read(driverWorkProvider.notifier).setOnline(value),
+        Card(
+          color: online ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: SwitchListTile.adaptive(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            secondary: Icon(online ? Icons.wifi_tethering : Icons.power_settings_new),
+            title: Text(online ? '正在听单' : '已收车', style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(online ? '位置上报与待抢订单刷新已开启' : '上线前请确认当前车辆和定位权限'),
+            value: online,
+            onChanged: work.isLoading ? null : (value) => ref.read(driverWorkProvider.notifier).setOnline(value),
+          ),
         ),
         if (work.hasError)
           Text(
@@ -37,8 +39,10 @@ class DriverWorkPage extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(locationError, style: TextStyle(color: Colors.orange.shade800)),
         ],
-        const Divider(),
-        Text('待抢订单', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 24),
+        Text('待抢订单', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 4),
+        Text('根据当前位置实时刷新', style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 8),
         if (!online)
           const Text('上线后显示附近可抢订单。')
@@ -58,8 +62,9 @@ class DriverWorkPage extends ConsumerWidget {
                     ],
                   ),
           ),
-        const Divider(height: 32),
-        Text('我的进行中订单', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 28),
+        Text('我的进行中订单', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
         orders.when(
           loading: () => const Padding(
             padding: EdgeInsets.all(12),
@@ -149,8 +154,11 @@ class _PendingOrderTileState extends ConsumerState<_PendingOrderTile> {
     final order = widget.order;
     final scheduled =
         order.isScheduled && order.scheduledPickupTime != null;
-    return ListTile(
-      title: Row(
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        contentPadding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+        title: Row(
         children: [
           if (scheduled) ...[
             Container(
@@ -178,12 +186,12 @@ class _PendingOrderTileState extends ConsumerState<_PendingOrderTile> {
           ),
         ],
       ),
-      subtitle: Text(
+        subtitle: Text(
         scheduled
             ? '预约 ${_formatTime(order.scheduledPickupTime!)} 上车 · 预估 ¥${order.totalFare}'
             : '预估 ¥${order.totalFare}',
       ),
-      trailing: FilledButton(
+        trailing: FilledButton(
         onPressed: _loading
             ? null
             : () async {
@@ -224,6 +232,7 @@ class _PendingOrderTileState extends ConsumerState<_PendingOrderTile> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             : const Text('抢单'),
+        ),
       ),
     );
   }

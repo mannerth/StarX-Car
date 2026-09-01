@@ -48,14 +48,11 @@ async function review(driver: AdminDriver, decision: 'approved' | 'rejected') {
   catch (reason) { error.value = reason instanceof Error ? reason.message : '审核失败。' }
   finally { reviewingId.value = null }
 }
-function logout() { auth.logout(); void router.replace({ name: 'login' }) }
 onMounted(() => void load())
 </script>
 
 <template>
-  <div class="admin-shell">
-    <aside><div class="brand"><span>S</span><strong>StarX-Car</strong></div><nav><RouterLink to="/orders">订单监控</RouterLink><RouterLink to="/reservations">预约运营</RouterLink><RouterLink to="/users">用户管理</RouterLink><RouterLink to="/drivers">司机审核</RouterLink><RouterLink to="/pricing">计费管理</RouterLink><RouterLink to="/profile">个人中心</RouterLink></nav><button class="logout" @click="logout">退出登录</button></aside>
-    <main class="content">
+  <section class="page-content">
       <header><div><p class="eyebrow">运营管理</p><h1>司机审核</h1><p>核对司机身份、驾驶证和当前车辆资料。</p></div><div class="operator">{{ auth.user?.username }}<small>管理员</small></div></header>
       <section class="panel">
         <form class="filters" @submit.prevent="search"><input v-model="keyword" placeholder="搜索姓名、账号、手机号或证件号" /><select v-model="approvalStatus"><option value="">全部审核状态</option><option value="pending">待审核</option><option value="approved">已通过</option><option value="rejected">已驳回</option></select><button>查询</button></form>
@@ -66,6 +63,5 @@ onMounted(() => void load())
         </tbody></table></div>
         <footer class="pagination"><span>共 {{ total }} 位司机</span><div><button :disabled="page <= 1 || loading" @click="page--; load()">上一页</button><span>第 {{ page }} / {{ totalPages }} 页</span><button :disabled="page >= totalPages || loading" @click="page++; load()">下一页</button></div></footer>
       </section>
-    </main>
-  </div>
+    </section>
 </template>

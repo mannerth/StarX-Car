@@ -125,6 +125,24 @@ class AdminPricingRuleServiceImplTests {
     }
 
     @Test
+    void promotesEnabledNonDefaultRuleToDefault() {
+        PricingRule rule = rule(7L, PricingRuleStatus.active, false);
+        given(ruleMapper.selectByIdForUpdate(7L)).willReturn(rule);
+        given(ruleMapper.lockActiveDefaultRuleIds()).willReturn(List.of(3L));
+        given(ruleMapper.deactivateOtherDefaultRules(7L, 9L)).willReturn(1);
+        given(ruleMapper.makeActiveRuleDefault(7L, 9L)).willReturn(1);
+
+        PricingRuleResponse response = service.activate(9L, 7L, new PricingRuleActivationRequest(true));
+
+        assertThat(response.status()).isEqualTo(PricingRuleStatus.active);
+        assertThat(response.defaultRule()).isTrue();
+        verify(ruleMapper).lockActiveDefaultRuleIds();
+        verify(ruleMapper).deactivateOtherDefaultRules(7L, 9L);
+        verify(ruleMapper).makeActiveRuleDefault(7L, 9L);
+        verify(ruleMapper, never()).activateDraftRule(eq(7L), eq(9L), any(Boolean.class));
+    }
+
+    @Test
     void cannotArchiveCurrentDefaultRule() {
         given(ruleMapper.selectByIdForUpdate(7L)).willReturn(rule(7L, PricingRuleStatus.active, true));
 

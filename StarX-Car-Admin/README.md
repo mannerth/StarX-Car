@@ -2,6 +2,8 @@
 
 StarX-Car-Admin 是网约车系统的后台管理 Web 应用。它面向 `admin` 角色，提供账号登录、订单监控与预约运营、用户管理、司机审核、计费规则管理、投诉售后运营、个人资料维护和密码修改功能。投诉工单支持筛选、关联订单查看及道歉、驳回、部分/全额退款处理。
 
+界面基于 Element Plus 重构：`AdminLayout` 集中管理侧栏导航、管理员菜单和退出登录，运营页面仅负责自身业务内容。路由采用按需加载，桌面与窄屏均复用同一套运营工作台布局。
+
 后端项目位于相邻的 `../StarX-Car-Backend` 目录；默认开发环境通过 Vite 代理将 `/api` 请求转发到 `http://localhost:8080`。
 
 ## 技术栈
@@ -120,7 +122,7 @@ StarX-Car-Admin 是网约车系统的后台管理 Web 应用。它面向 `admin`
 | `PUT` | `/api/admin/drivers/{driverId}/approval` | 通过或驳回待审核司机 |
 | `GET` / `POST` | `/api/admin/pricing-rules` | 分页查询或新建计费规则草稿 |
 | `GET` / `PUT` | `/api/admin/pricing-rules/{ruleId}` | 查看或更新计费规则草稿 |
-| `POST` | `/api/admin/pricing-rules/{ruleId}/activate` | 激活规则，可同时设为默认 |
+| `POST` | `/api/admin/pricing-rules/{ruleId}/activate` | 激活草稿，或将已启用规则设为新订单默认 |
 | `POST` | `/api/admin/pricing-rules/{ruleId}/archive` | 归档非当前默认规则 |
 | `GET` | `/api/users/me` | 获取当前管理员资料 |
 | `PUT` | `/api/users/me` | 修改当前管理员资料 |
@@ -189,4 +191,5 @@ src/
 - 管理端不在浏览器端保存或展示默认密码；默认密码只由后端 `ADMIN_DEFAULT_PASSWORD` 配置决定。
 - 令牌保存在 `localStorage` 便于当前单页应用保持会话。生产部署仍应配合 HTTPS、受信任域名与内容安全策略。
 - 用户列表的权限、删除限制和密码重置权限均由后端再次校验，前端仅负责交互展示。
+- 计费规则中仅“新订单默认”规则用于新订单计价；已启用但非默认的规则可保留，并一键切换为默认，切换不影响历史订单。
 - 管理端当前覆盖账号、司机准入、计费规则、订单监控和预约运营；支付、退款、订单轨迹回放、自动派单和司机收入运营能力尚未实现。

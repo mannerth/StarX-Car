@@ -11,6 +11,9 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
+        // Mirrors keep Android dependency resolution available when dl.google.com is unreachable.
+        maven(url = "https://maven.aliyun.com/repository/google")
+        maven(url = "https://repo.huaweicloud.com/repository/maven/")
         google()
         mavenCentral()
         gradlePluginPortal()

@@ -38,20 +38,16 @@ async function savePassword() {
     success.value = '密码已修改。'
   } catch (reason) { error.value = reason instanceof Error ? reason.message : '修改密码失败。' } finally { loading.value = false }
 }
-function logout() { auth.logout(); void router.replace({ name: 'login' }) }
 onMounted(() => void load())
 </script>
 
 <template>
-  <div class="admin-shell">
-    <aside><div class="brand"><span>S</span><strong>StarX-Car</strong></div><nav><RouterLink to="/orders">订单监控</RouterLink><RouterLink to="/reservations">预约运营</RouterLink><RouterLink to="/users">用户管理</RouterLink><RouterLink to="/drivers">司机审核</RouterLink><RouterLink to="/pricing">计费管理</RouterLink><RouterLink to="/profile">个人中心</RouterLink></nav><button class="logout" @click="logout">退出登录</button></aside>
-    <main class="content">
+  <section class="page-content">
       <header><div><p class="eyebrow">账户设置</p><h1>个人中心</h1><p>维护管理员个人资料与登录密码。</p></div><div class="operator">{{ auth.user?.username }}<small>管理员</small></div></header>
       <p v-if="error" class="error">{{ error }}</p><p v-if="success" class="success">{{ success }}</p>
       <div class="profile-grid">
         <form class="panel settings-form" @submit.prevent="saveProfile"><h2>个人资料</h2><label>用户名<input v-model="profile.username" required minlength="3" maxlength="50" /></label><label>真实姓名<input v-model="profile.realName" maxlength="50" /></label><label>头像地址<input v-model="profile.avatarUrl" type="url" maxlength="255" /></label><label>邮箱<input v-model="profile.email" type="email" maxlength="50" /></label><label>性别<select v-model="profile.gender"><option value="male">男</option><option value="female">女</option></select></label><button :disabled="loading">保存资料</button></form>
         <form class="panel settings-form" @submit.prevent="savePassword"><h2>修改密码</h2><label>原密码<input v-model="password.current" required type="password" autocomplete="current-password" /></label><label>新密码<input v-model="password.next" required type="password" minlength="6" maxlength="72" autocomplete="new-password" /></label><label>确认新密码<input v-model="password.confirmation" required type="password" minlength="6" maxlength="72" autocomplete="new-password" /></label><button :disabled="loading">修改密码</button></form>
       </div>
-    </main>
-  </div>
+    </section>
 </template>

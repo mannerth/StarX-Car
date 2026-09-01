@@ -90,13 +90,22 @@ class _ProfileContent extends ConsumerWidget {
           child: Text((profile.realName ?? profile.username).substring(0, 1)),
         ),
         const SizedBox(height: 12),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.account_balance_wallet_outlined),
-            title: const Text('账户余额'),
-            subtitle: wallet.when(loading: () => const Text('加载中…'), error: (_, _) => const Text('加载失败，点击重试'), data: (value) => Text('${value.balance.toStringAsFixed(2)} 元')),
-            trailing: const Icon(Icons.add_circle_outline),
-            onTap: () => _recharge(context, ref),
+        InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _recharge(context, ref),
+          child: Ink(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(16)),
+            child: Row(children: [
+              const Icon(Icons.account_balance_wallet_outlined, color: Colors.white, size: 30),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('账户余额', style: TextStyle(color: Colors.white70)),
+                const SizedBox(height: 3),
+                wallet.when(loading: () => const Text('加载中…', style: TextStyle(color: Colors.white)), error: (_, _) => const Text('点击重试', style: TextStyle(color: Colors.white)), data: (value) => Text('¥ ${value.balance.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w700))),
+              ])),
+              const Icon(Icons.add_circle_outline, color: Colors.white),
+            ]),
           ),
         ),
         const SizedBox(height: 12),

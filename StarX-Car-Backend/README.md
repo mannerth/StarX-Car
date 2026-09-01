@@ -216,7 +216,7 @@ src/main/java/org/mannerth/starxcar/
 | `GET` | `/api/admin/pricing-rules` | 管理员 | 分页查询规则和完整分段，可按 `draft`、`active`、`inactive`、`archived` 状态筛选。 |
 | `POST` | `/api/admin/pricing-rules` | 管理员 | 完整提交三类分段，新建下一版本的 `draft` 规则。 |
 | `GET` / `PUT` | `/api/admin/pricing-rules/{ruleId}` | 管理员 | 查看规则；或完整更新未被订单引用的草稿分段。 |
-| `POST` | `/api/admin/pricing-rules/{ruleId}/activate` | 管理员 | 激活草稿；`setAsDefault=true` 时原子切换当前默认规则。 |
+| `POST` | `/api/admin/pricing-rules/{ruleId}/activate` | 管理员 | 激活草稿；或以 `setAsDefault=true` 将已启用规则原子切换为新订单默认。 |
 | `POST` | `/api/admin/pricing-rules/{ruleId}/archive` | 管理员 | 归档非当前默认规则，保留历史规则及已结算订单可读性。 |
 | `GET` | `/api/admin/drivers` | 管理员 | 分页查询司机审核资料，可按 `pending`、`approved`、`rejected` 状态及账号、姓名、联系方式或证件号筛选。 |
 | `PUT` | `/api/admin/drivers/{driverId}/approval` | 管理员 | 将待审核司机处理为 `approved` 或 `rejected`；已审核或账号不可用时拒绝操作。 |

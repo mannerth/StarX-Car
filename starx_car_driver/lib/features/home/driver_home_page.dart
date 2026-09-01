@@ -181,13 +181,22 @@ class DriverProfileTab extends ConsumerWidget {
           u.realName ?? u.username,
           style: Theme.of(context).textTheme.headlineSmall,
         ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.account_balance_wallet_outlined),
-            title: const Text('收入余额'),
-            subtitle: wallet.when(loading: () => const Text('加载中…'), error: (_, _) => const Text('加载失败，点击重试'), data: (value) => Text('${value.balance.toStringAsFixed(2)} 元')),
-            trailing: const Icon(Icons.arrow_outward),
-            onTap: () => _withdraw(context, ref),
+        InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _withdraw(context, ref),
+          child: Ink(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(16)),
+            child: Row(children: [
+              const Icon(Icons.account_balance_wallet_outlined, color: Colors.white, size: 30),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('可提现收入', style: TextStyle(color: Colors.white70)),
+                const SizedBox(height: 3),
+                wallet.when(loading: () => const Text('加载中…', style: TextStyle(color: Colors.white)), error: (_, _) => const Text('点击重试', style: TextStyle(color: Colors.white)), data: (value) => Text('¥ ${value.balance.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w700))),
+              ])),
+              const Icon(Icons.arrow_outward, color: Colors.white),
+            ]),
           ),
         ),
         const SizedBox(height: 12),

@@ -1,14 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import LoginView from '@/views/LoginView.vue'
-import UserManagementView from '@/views/UserManagementView.vue'
-import ProfileView from '@/views/ProfileView.vue'
-import DriverReviewView from '@/views/DriverReviewView.vue'
-import PricingManagementView from '@/views/PricingManagementView.vue'
-import OrderMonitoringView from '@/views/OrderMonitoringView.vue'
-import ReservationOperationsView from '@/views/ReservationOperationsView.vue'
-import OrderDetailView from '@/views/OrderDetailView.vue'
-import ComplaintOperationsView from '@/views/ComplaintOperationsView.vue'
+const LoginView = () => import('@/views/LoginView.vue')
+const UserManagementView = () => import('@/views/UserManagementView.vue')
+const ProfileView = () => import('@/views/ProfileView.vue')
+const DriverReviewView = () => import('@/views/DriverReviewView.vue')
+const PricingManagementView = () => import('@/views/PricingManagementView.vue')
+const OrderMonitoringView = () => import('@/views/OrderMonitoringView.vue')
+const ReservationOperationsView = () => import('@/views/ReservationOperationsView.vue')
+const OrderDetailView = () => import('@/views/OrderDetailView.vue')
+const ComplaintOperationsView = () => import('@/views/ComplaintOperationsView.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

@@ -1,6 +1,6 @@
 # StarX-Car 司机端
 
-`starx_car_driver` 是 StarX-Car 的司机 Android App，依赖本地 `starx_car_common`。当前已完成司机账号、个人资料、车辆、听单工作台和进行中订单状态流转；个人中心展示收入余额并提供不可透支的模拟提现入口。
+`starx_car_driver` 是 StarX-Car 的司机 Android App，依赖本地 `starx_car_common`。当前已完成司机账号、个人资料、车辆、听单工作台和进行中订单状态流转；个人中心展示收入余额并提供不可透支的模拟提现入口。界面使用统一的蓝色 Material 3 主题，听单状态、订单和收入采用高对比信息卡以便快速扫描。
 
 ## 当前状态
 
@@ -87,6 +87,7 @@ lib/
 - 若日志出现 `SERVICE_NOT_EXIST`，说明 Key 已被识别但高德控制台未开通 Android 定位 SDK 服务；请在该 Key 的“服务平台/服务权限”中启用定位，并核对包名 `org.mannerth.starxcar.driver` 与实际 debug/release SHA-1。`hiddenapi` 反射提示是高德 SDK 在 Android 新版本上的兼容性警告，不是业务失败原因。
 - 本地开发允许 HTTP，生产必须改用 HTTPS。
 - 因工程位于 D 盘、Flutter Pub 缓存位于 C 盘，已关闭 Kotlin 增量编译并使用进程内编译，避免 `image_picker_android` 的跨盘缓存错误；首次 Android 构建会稍慢。
+- Android Gradle 依赖按阿里云 Google 镜像、华为云镜像、`google()`、Maven Central 的顺序解析，以应对本机无法连接 `dl.google.com` 的网络环境；镜像不可用时仍会回退官方仓库。仓库内不配置本地代理，若使用代理请在本机 Gradle 用户配置中设置实际正在运行的地址。
 - 未配置 `android/key.properties` 时仍可构建 debug APK；配置本机 release 签名后 release 构建会自动使用它。
 - 签名文件和 `key.properties` 均不可提交、删除或分享。
 - release 签名路径从 Android 项目根目录解析，当前本机配置可使用仓库根目录 `android-signing/starx-car-release.jks` 构建；APK 证书 SHA-1 为 `4C:83:43:EE:4B:E8:5E:0B:89:7A:29:E9:83:D8:17:C1:9A:0C:BF:73`，须在高德控制台登记到司机端 Key。

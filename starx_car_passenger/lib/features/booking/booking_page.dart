@@ -298,6 +298,8 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
         children: [
           Material(
             color: Theme.of(context).colorScheme.surface,
+            elevation: 1,
+            shadowColor: Colors.black12,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Column(

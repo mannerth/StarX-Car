@@ -1,5 +1,6 @@
 ## Unreleased
 
+- 新增高德全国 POI 分页搜索通道：支持传入页码和每页数量、返回 `hasMore`，有定位点时由高德按距离排序；保留原搜索接口以兼容既有调用方。
 - 新增 `OrderStatus.terminated` 与 `OrderTerminationResult`，解析服务端中途结束订单的实际里程、时长和结算金额。
 - 新增 `WalletBalance` 与 `WalletApi`，封装跨角色的余额查询、充值和提现 HTTP 传输，不引入角色业务流程。
 

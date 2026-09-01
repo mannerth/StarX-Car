@@ -33,7 +33,6 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
   String? _routeError;
   GeoPoint _mapCenter = _defaultPoint;
   bool _hasSearchCenter = false;
-  String? _searchCity;
   AmapLocationService? _locationService;
   CancelToken? _cancelToken;
   int _routeRequest = 0;
@@ -76,7 +75,6 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
         builder: (_) => _PlaceSearchPage(
           title: pickup ? '选择上车地' : '选择目的地',
           near: _hasSearchCenter ? _mapCenter : null,
-          city: _searchCity,
         ),
       ),
     );
@@ -88,7 +86,6 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
     setState(() {
       if (pickup) {
         _pickup = place;
-        _searchCity ??= place.cityName;
       } else {
         _destination = place;
       }
@@ -122,7 +119,6 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
       setState(() {
         _mapCenter = point;
         _hasSearchCenter = true;
-        _searchCity = place.cityName;
         _pickup ??= place;
         _quote = null;
       });
@@ -215,8 +211,7 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
 
   Future<void> _quoteRide() async {
     if (_pickup == null || _destination == null) return;
-    if (_orderType == OrderType.scheduled &&
-        _scheduledPickupTime == null) {
+    if (_orderType == OrderType.scheduled && _scheduledPickupTime == null) {
       _showMessage('请先选择预约上车时间。');
       return;
     }
@@ -536,29 +531,43 @@ String _formatTime(DateTime time) {
 }
 
 class _PlaceSearchPage extends StatefulWidget {
-  const _PlaceSearchPage({required this.title, this.near, this.city});
+  const _PlaceSearchPage({required this.title, this.near});
 
   final String title;
   final GeoPoint? near;
-  final String? city;
 
   @override
   State<_PlaceSearchPage> createState() => _PlaceSearchPageState();
 }
 
 class _PlaceSearchPageState extends State<_PlaceSearchPage> {
+  static const _pageSize = 20;
   final _controller = TextEditingController();
+  final _scrollController = ScrollController();
   List<Place> _results = const [];
   Timer? _searchDebounce;
   bool _loading = false;
+  bool _loadingMore = false;
+  bool _hasMore = false;
+  bool _loadMoreFailed = false;
+  int _nextPage = 0;
   String? _error;
   String? _searchedKeyword;
   int _searchRequest = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
   void dispose() {
     _searchDebounce?.cancel();
     _searchRequest++;
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -572,6 +581,10 @@ class _PlaceSearchPageState extends State<_PlaceSearchPage> {
       _error = null;
       _searchedKeyword = null;
       _loading = false;
+      _loadingMore = false;
+      _hasMore = false;
+      _loadMoreFailed = false;
+      _nextPage = 0;
     });
     if (keyword.isEmpty) return;
     _searchDebounce = Timer(
@@ -599,17 +612,20 @@ class _PlaceSearchPageState extends State<_PlaceSearchPage> {
       _error = null;
     });
     try {
-      final results = await const AmapSearchService().searchPoi(
+      final result = await const AmapSearchService().searchPoiPage(
         keyword,
         near: widget.near,
-        //city: widget.city,
+        pageSize: _pageSize,
       );
       if (!mounted || request != _searchRequest) return;
       setState(() {
-        _results = results;
+        _results = _mergePlaces(const [], result.records);
+        _nextPage = result.page + 1;
+        _hasMore = result.hasMore;
         _searchedKeyword = keyword;
         _loading = false;
       });
+      _loadMoreIfNeeded();
     } on Object {
       if (!mounted || request != _searchRequest) return;
       setState(() {
@@ -617,6 +633,60 @@ class _PlaceSearchPageState extends State<_PlaceSearchPage> {
         _loading = false;
       });
     }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.extentAfter < 240) _loadMore();
+  }
+
+  void _loadMoreIfNeeded() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      if (_scrollController.position.extentAfter < 240) _loadMore();
+    });
+  }
+
+  Future<void> _loadMore() async {
+    final keyword = _searchedKeyword;
+    if (keyword == null ||
+        !_hasMore ||
+        _loading ||
+        _loadingMore ||
+        _loadMoreFailed) {
+      return;
+    }
+    final request = _searchRequest;
+    setState(() {
+      _loadingMore = true;
+      _loadMoreFailed = false;
+    });
+    try {
+      final result = await const AmapSearchService().searchPoiPage(
+        keyword,
+        near: widget.near,
+        page: _nextPage,
+        pageSize: _pageSize,
+      );
+      if (!mounted || request != _searchRequest) return;
+      setState(() {
+        _results = _mergePlaces(_results, result.records);
+        _nextPage = result.page + 1;
+        _hasMore = result.hasMore;
+        _loadingMore = false;
+      });
+      _loadMoreIfNeeded();
+    } on Object {
+      if (!mounted || request != _searchRequest) return;
+      setState(() {
+        _loadingMore = false;
+        _loadMoreFailed = true;
+      });
+    }
+  }
+
+  void _retryLoadMore() {
+    setState(() => _loadMoreFailed = false);
+    _loadMore();
   }
 
   void _clearQuery() {
@@ -667,9 +737,19 @@ class _PlaceSearchPageState extends State<_PlaceSearchPage> {
                   message: _emptyMessage(),
                 )
               : ListView.separated(
-                  itemCount: _results.length,
+                  controller: _scrollController,
+                  itemCount:
+                      _results.length +
+                      (_hasMore || _loadingMore || _loadMoreFailed ? 1 : 0),
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, index) {
+                    if (index == _results.length) {
+                      return _SearchPageFooter(
+                        loading: _loadingMore,
+                        failed: _loadMoreFailed,
+                        onRetry: _retryLoadMore,
+                      );
+                    }
                     final place = _results[index];
                     final details = _placeDetails(place);
                     return ListTile(
@@ -716,6 +796,58 @@ class _PlaceSearchPageState extends State<_PlaceSearchPage> {
       meters < 1000 ? '$meters 米' : '${(meters / 1000).toStringAsFixed(1)} 公里';
 }
 
+List<Place> _mergePlaces(List<Place> existing, List<Place> incoming) {
+  final unique = <String, Place>{};
+  for (final place in [...existing, ...incoming]) {
+    final poiId = place.amapPoiId?.trim();
+    final key = poiId?.isNotEmpty == true
+        ? 'poi:$poiId'
+        : '${place.name}:${place.location.latitude}:${place.location.longitude}';
+    unique.putIfAbsent(key, () => place);
+  }
+  final values = unique.values.toList();
+  values.sort((left, right) {
+    final leftDistance = left.distanceM;
+    final rightDistance = right.distanceM;
+    if (leftDistance == null && rightDistance == null) return 0;
+    if (leftDistance == null) return 1;
+    if (rightDistance == null) return -1;
+    return leftDistance.compareTo(rightDistance);
+  });
+  return values;
+}
+
+class _SearchPageFooter extends StatelessWidget {
+  const _SearchPageFooter({
+    required this.loading,
+    required this.failed,
+    required this.onRetry,
+  });
+
+  final bool loading;
+  final bool failed;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 56,
+    child: Center(
+      child: failed
+          ? TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('加载更多失败，点击重试'),
+            )
+          : loading
+          ? const SizedBox.square(
+              dimension: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const SizedBox.shrink(),
+    ),
+  );
+}
+
 class _SearchMessage extends StatelessWidget {
   const _SearchMessage({
     required this.icon,
@@ -752,4 +884,3 @@ class _SearchMessage extends StatelessWidget {
     ),
   );
 }
-

@@ -31,6 +31,63 @@ class AmapSearchService {
     return _searchPoi(normalizedKeyword, near: near);
   }
 
+  /// Searches POIs nationwide with zero-based pagination.
+  ///
+  /// When [near] is provided, AMap ranks the complete result set by distance
+  /// from that GCJ-02 point before applying pagination.
+  Future<AmapPoiPage> searchPoiPage(
+    String keyword, {
+    GeoPoint? near,
+    int page = 0,
+    int pageSize = 20,
+  }) async {
+    if (keyword.trim().isEmpty) {
+      return AmapPoiPage(
+        page: page,
+        pageSize: pageSize,
+        hasMore: false,
+        records: const [],
+      );
+    }
+    if (page < 0) throw ArgumentError.value(page, 'page', '不能小于 0');
+    if (pageSize < 1 || pageSize > 50) {
+      throw ArgumentError.value(pageSize, 'pageSize', '必须在 1 到 50 之间');
+    }
+    _check(near);
+    final response = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'searchPoiPage',
+      {
+        'keyword': keyword.trim(),
+        'page': page,
+        'pageSize': pageSize,
+        if (near != null) ...{
+          'latitude': near.latitude,
+          'longitude': near.longitude,
+        },
+      },
+    );
+    if (response == null) {
+      return AmapPoiPage(
+        page: page,
+        pageSize: pageSize,
+        hasMore: false,
+        records: const [],
+      );
+    }
+    final rawRecords = response['records'];
+    return AmapPoiPage(
+      page: (response['page'] as num?)?.toInt() ?? page,
+      pageSize: (response['pageSize'] as num?)?.toInt() ?? pageSize,
+      hasMore: response['hasMore'] == true,
+      records: rawRecords is List
+          ? rawRecords
+                .whereType<Map>()
+                .map((raw) => _placeFromJson(Map<Object?, Object?>.from(raw)))
+                .toList(growable: false)
+          : const [],
+    );
+  }
+
   Future<List<Place>> _searchPoi(
     String keyword, {
     String? city,
@@ -49,18 +106,7 @@ class AmapSearchService {
         .whereType<Map>()
         .map((raw) {
           final json = Map<Object?, Object?>.from(raw);
-          return Place(
-            name: json['name']?.toString() ?? '未命名地点',
-            address: json['address']?.toString(),
-            amapPoiId: json['poiId']?.toString(),
-            cityName: json['cityName']?.toString(),
-            districtName: json['districtName']?.toString(),
-            distanceM: (json['distanceM'] as num?)?.toInt(),
-            location: GeoPoint(
-              latitude: (json['latitude'] as num).toDouble(),
-              longitude: (json['longitude'] as num).toDouble(),
-            ),
-          );
+          return _placeFromJson(json);
         })
         .toList(growable: false);
   }
@@ -90,3 +136,30 @@ class AmapSearchService {
     }
   }
 }
+
+class AmapPoiPage {
+  const AmapPoiPage({
+    required this.page,
+    required this.pageSize,
+    required this.hasMore,
+    required this.records,
+  });
+
+  final int page;
+  final int pageSize;
+  final bool hasMore;
+  final List<Place> records;
+}
+
+Place _placeFromJson(Map<Object?, Object?> json) => Place(
+  name: json['name']?.toString() ?? '未命名地点',
+  address: json['address']?.toString(),
+  amapPoiId: json['poiId']?.toString(),
+  cityName: json['cityName']?.toString(),
+  districtName: json['districtName']?.toString(),
+  distanceM: (json['distanceM'] as num?)?.toInt(),
+  location: GeoPoint(
+    latitude: (json['latitude'] as num).toDouble(),
+    longitude: (json['longitude'] as num).toDouble(),
+  ),
+);

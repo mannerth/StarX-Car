@@ -116,7 +116,11 @@ public final class StarxCarCommonPlugin implements FlutterPlugin, MethodChannel.
     @Override
     public void onMethodCall(@NonNull MethodCall call, @NonNull MethodChannel.Result result) {
         if ("searchPoi".equals(call.method)) {
-            searchPoi(call, result);
+            searchPoi(call, result, false);
+            return;
+        }
+        if ("searchPoiPage".equals(call.method)) {
+            searchPoi(call, result, true);
             return;
         }
         if ("reverseGeocode".equals(call.method)) {
@@ -234,7 +238,7 @@ public final class StarxCarCommonPlugin implements FlutterPlugin, MethodChannel.
                 == PackageManager.PERMISSION_GRANTED;
     }
 
-    private void searchPoi(MethodCall call, MethodChannel.Result result) {
+    private void searchPoi(MethodCall call, MethodChannel.Result result, boolean paged) {
         if (!(call.arguments instanceof Map)) {
             result.error("INVALID_ARGUMENT", "POI 搜索参数格式无效", null);
             return;
@@ -244,9 +248,12 @@ public final class StarxCarCommonPlugin implements FlutterPlugin, MethodChannel.
             String keyword = String.valueOf(args.get("keyword")).trim();
             if (keyword.isEmpty()) throw new IllegalArgumentException("keyword");
             String city = args.get("city") == null ? "" : String.valueOf(args.get("city"));
+            int page = args.get("page") instanceof Number ? ((Number) args.get("page")).intValue() : 0;
+            int pageSize = args.get("pageSize") instanceof Number ? ((Number) args.get("pageSize")).intValue() : 20;
+            if (page < 0 || pageSize < 1 || pageSize > 50) throw new IllegalArgumentException("page");
             PoiSearch.Query query = new PoiSearch.Query(keyword, "", city);
-            query.setPageSize(20);
-            query.setPageNum(0);
+            query.setPageSize(pageSize);
+            query.setPageNum(page);
             query.setDistanceSort(true);
             query.setCityLimit(!city.isEmpty());
             Double lat = optionalNumber(args.get("latitude"));
@@ -282,7 +289,16 @@ public final class StarxCarCommonPlugin implements FlutterPlugin, MethodChannel.
                             values.add(value);
                         }
                     }
-                    result.success(values);
+                    if (!paged) {
+                        result.success(values);
+                        return;
+                    }
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("page", page);
+                    response.put("pageSize", pageSize);
+                    response.put("hasMore", page + 1 < poiResult.getPageCount());
+                    response.put("records", values);
+                    result.success(response);
                 }
 
                 @Override

@@ -268,8 +268,6 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
           ),
         if (order.status == OrderStatus.driverArrived) ...[
           const Divider(height: 8),
-          _InfoRow(label: '乘客手机尾号', value: order.passengerPhoneTail ?? '未提供'),
-          const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _busy ? null : () => _confirmStartService(order),
             icon: const Icon(Icons.play_arrow),

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
 import 'passenger_repository.dart';
+import '../orders/passenger_complaints_page.dart';
 import '../orders/passenger_ratings_page.dart';
 
 final passengerRepositoryProvider = Provider<PassengerRepository>(
@@ -95,17 +96,51 @@ class _ProfileContent extends ConsumerWidget {
           onTap: () => _recharge(context, ref),
           child: Ink(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(16)),
-            child: Row(children: [
-              const Icon(Icons.account_balance_wallet_outlined, color: Colors.white, size: 30),
-              const SizedBox(width: 14),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('账户余额', style: TextStyle(color: Colors.white70)),
-                const SizedBox(height: 3),
-                wallet.when(loading: () => const Text('加载中…', style: TextStyle(color: Colors.white)), error: (_, _) => const Text('点击重试', style: TextStyle(color: Colors.white)), data: (value) => Text('¥ ${value.balance.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w700))),
-              ])),
-              const Icon(Icons.add_circle_outline, color: Colors.white),
-            ]),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  color: Colors.white,
+                  size: 30,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '账户余额',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 3),
+                      wallet.when(
+                        loading: () => const Text(
+                          '加载中…',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        error: (_, _) => const Text(
+                          '点击重试',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        data: (value) => Text(
+                          '¥ ${value.balance.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 27,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.add_circle_outline, color: Colors.white),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -159,16 +194,32 @@ class _ProfileContent extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         Card(
-          child: ListTile(
-            leading: const Icon(Icons.star_outline),
-            title: const Text('我的评价'),
-            subtitle: const Text('查看我提交过的行程评价'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const PassengerRatingsPage(),
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.star_outline),
+                title: const Text('我的评价'),
+                subtitle: const Text('查看我提交过的行程评价'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const PassengerRatingsPage(),
+                  ),
+                ),
               ),
-            ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.report_problem_outlined),
+                title: const Text('我的投诉'),
+                subtitle: const Text('查看处理进度、管理员回复和退款结果'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const PassengerComplaintsPage(),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -204,7 +255,46 @@ class _ProfileContent extends ConsumerWidget {
 
   Future<void> _recharge(BuildContext context, WidgetRef ref) async {
     final controller = TextEditingController();
-    await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(title: const Text('余额充值'), content: TextField(controller: controller, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '充值金额（元）')), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('取消')), FilledButton(onPressed: () async { final amount = double.tryParse(controller.text.trim()); if (amount == null || amount <= 0) { ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(content: Text('请输入大于 0 的金额'))); return; } try { await ref.read(passengerRepositoryProvider).recharge(amount); ref.invalidate(passengerWalletProvider); if (dialogContext.mounted) Navigator.pop(dialogContext); } on ApiException catch (error) { if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(error.message))); } }, child: const Text('确认充值'))]));
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('余额充值'),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(labelText: '充值金额（元）'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final amount = double.tryParse(controller.text.trim());
+              if (amount == null || amount <= 0) {
+                ScaffoldMessenger.of(
+                  dialogContext,
+                ).showSnackBar(const SnackBar(content: Text('请输入大于 0 的金额')));
+                return;
+              }
+              try {
+                await ref.read(passengerRepositoryProvider).recharge(amount);
+                ref.invalidate(passengerWalletProvider);
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              } on ApiException catch (error) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(
+                    dialogContext,
+                  ).showSnackBar(SnackBar(content: Text(error.message)));
+                }
+              }
+            },
+            child: const Text('确认充值'),
+          ),
+        ],
+      ),
+    );
     controller.dispose();
   }
 

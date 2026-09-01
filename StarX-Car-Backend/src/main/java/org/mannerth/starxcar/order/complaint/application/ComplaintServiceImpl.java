@@ -48,10 +48,12 @@ public class ComplaintServiceImpl implements ComplaintService {
         return response(complaint);
     }
     @Override @Transactional
-    public ComplaintResponse resolve(Long adminId, String complaintNo, String resolutionType, BigDecimal refundAmount) {
+    public ComplaintResponse resolve(Long adminId, String complaintNo, String resolutionType, BigDecimal refundAmount,
+                                     String content) {
         Complaint complaint = complaintMapper.selectByComplaintNoForUpdate(complaintNo);
         if (complaint == null) throw notFound(); if (!"OPEN".equals(complaint.getStatus()) && !"PROCESSING".equals(complaint.getStatus())) throw conflict("投诉已处理");
         validateResolution(resolutionType, refundAmount);
+        String normalizedContent = required(content, "处理说明");
         LocalDateTime time = now();
         if (refundAmount.signum() > 0) {
             OrderPayment payment = paymentMapper.selectByOrderIdForUpdate(complaint.getOrderId());
@@ -68,6 +70,10 @@ public class ComplaintServiceImpl implements ComplaintService {
             rideOrderMapper.updatePaymentStatus(complaint.getOrderId(), status);
         }
         if (complaintMapper.resolve(complaint.getId(), resolutionType, refundAmount, adminId, time) != 1) throw conflict("投诉状态已变化");
+        if (complaintMapper.insertHandleLog(complaint.getId(), adminId, resolutionType, normalizedContent,
+                refundAmount, time) != 1) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "保存投诉处理说明失败");
+        }
         complaint.setStatus("RESOLVED"); complaint.setResolutionType(resolutionType); complaint.setRefundAmount(refundAmount); complaint.setResolvedTime(time); return response(complaint);
     }
     @Override
@@ -101,7 +107,13 @@ public class ComplaintServiceImpl implements ComplaintService {
         if ("FULL_REFUND".equals(type) && amount.signum() <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "全额退款金额必须大于零");
     }
     private LocalDateTime now() { return LocalDateTime.ofInstant(Instant.now(clock), ZONE).withNano(0); }
-    private ComplaintResponse response(Complaint c) { RideOrder order = rideOrderMapper.selectById(c.getOrderId()); if (order == null) throw notFound(); return new ComplaintResponse(c.getComplaintNo(), order.getOrderNo(), c.getComplaintType(), c.getContent(), c.getStatus(), c.getResolutionType(), c.getRefundAmount(), c.getCreatedTime(), c.getResolvedTime()); }
+    private ComplaintResponse response(Complaint c) { RideOrder order = rideOrderMapper.selectById(c.getOrderId()); if (order == null) throw notFound(); String resolutionContent = c.getResolutionType() == null ? null : complaintMapper.selectLatestHandleContent(c.getId()); return new ComplaintResponse(c.getComplaintNo(), order.getOrderNo(), c.getComplaintType(), c.getContent(), c.getStatus(), c.getResolutionType(), c.getRefundAmount(), resolutionContent, c.getCreatedTime(), c.getResolvedTime()); }
+    private String required(String value, String field) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + "不能为空");
+        }
+        return value.trim();
+    }
     private ResponseStatusException notFound() { return new ResponseStatusException(HttpStatus.NOT_FOUND, "投诉不存在或无权访问"); }
     private ResponseStatusException conflict(String m) { return new ResponseStatusException(HttpStatus.CONFLICT, m); }
 }

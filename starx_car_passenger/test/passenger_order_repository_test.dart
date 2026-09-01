@@ -253,9 +253,22 @@ void main() {
   });
 
   test('complaint posts trimmed type and content', () async {
-    final api = RecordingApiClient({});
+    final api = RecordingApiClient({
+      'POST /orders/ORD-TERM/complaints': {
+        'complaintNo': 'C1',
+        'orderNo': 'ORD-TERM',
+        'complaintType': 'ORDER_SERVICE',
+        'content': '服务问题',
+        'status': 'OPEN',
+        'resolutionType': null,
+        'refundAmount': '0.00',
+        'resolutionContent': null,
+        'createdTime': '2026-09-01 14:00:00',
+        'resolvedTime': null,
+      },
+    });
 
-    await PassengerOrderRepository(api).createComplaint(
+    final complaint = await PassengerOrderRepository(api).createComplaint(
       'ORD-TERM',
       complaintType: ' ORDER_SERVICE ',
       content: ' 服务问题 ',
@@ -263,6 +276,45 @@ void main() {
 
     expect(api.lastPath, 'POST /orders/ORD-TERM/complaints');
     expect(api.lastData, {'complaintType': 'ORDER_SERVICE', 'content': '服务问题'});
+    expect(complaint.complaintNo, 'C1');
+    expect(complaint.resolved, isFalse);
+  });
+
+  test('my complaints parses admin reply and resolution progress', () async {
+    final api = RecordingApiClient({
+      'GET /complaints/me': {
+        'page': 2,
+        'size': 20,
+        'total': 21,
+        'records': [
+          {
+            'complaintNo': 'C2',
+            'orderNo': 'ORD-TERM',
+            'complaintType': 'ORDER_SERVICE',
+            'content': '服务问题',
+            'status': 'RESOLVED',
+            'resolutionType': 'PARTIAL_REFUND',
+            'refundAmount': '5.00',
+            'resolutionContent': '已核实并退回部分费用',
+            'createdTime': '2026-09-01 14:00:00',
+            'resolvedTime': '2026-09-01 15:00:00',
+          },
+        ],
+      },
+    });
+
+    final page = await PassengerOrderRepository(
+      api,
+    ).myComplaints(page: 2, size: 20);
+
+    expect(api.lastPath, 'GET /complaints/me');
+    expect(api.lastQuery, {'page': 2, 'size': 20});
+    expect(page.total, 21);
+    expect(page.records.single.resolved, isTrue);
+    expect(page.records.single.resolutionType, 'PARTIAL_REFUND');
+    expect(page.records.single.refundAmount, '5.00');
+    expect(page.records.single.resolutionContent, '已核实并退回部分费用');
+    expect(page.records.single.resolvedTime, DateTime(2026, 9, 1, 15));
   });
 
   test('submitRating posts the star score and trimmed content', () async {

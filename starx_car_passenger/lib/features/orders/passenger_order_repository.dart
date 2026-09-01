@@ -102,13 +102,32 @@ class PassengerOrderRepository {
         : {'reason': reason.trim()},
   );
 
-  Future<void> createComplaint(
+  Future<PassengerComplaint> createComplaint(
     String orderNo, {
     required String complaintType,
     required String content,
-  }) async => _api.post(
-    '/orders/$orderNo/complaints',
-    data: {'complaintType': complaintType.trim(), 'content': content.trim()},
+  }) async => PassengerComplaint.fromJson(
+    await _api.post(
+          '/orders/$orderNo/complaints',
+          data: {
+            'complaintType': complaintType.trim(),
+            'content': content.trim(),
+          },
+        )
+        as Map<String, dynamic>,
+  );
+
+  Future<PassengerComplaintPage> myComplaints({
+    int page = 1,
+    int size = 20,
+    CancelToken? cancelToken,
+  }) async => PassengerComplaintPage.fromJson(
+    await _api.get(
+          '/complaints/me',
+          queryParameters: {'page': page, 'size': size},
+          cancelToken: cancelToken,
+        )
+        as Map<String, dynamic>,
   );
 
   Future<OrderTerminationResult> terminate(
@@ -271,3 +290,74 @@ class RatingPage {
         .toList(growable: false)),
   );
 }
+
+/// One complaint submitted by the current passenger and its final resolution.
+class PassengerComplaint {
+  const PassengerComplaint({
+    required this.complaintNo,
+    required this.orderNo,
+    required this.complaintType,
+    required this.content,
+    required this.status,
+    required this.refundAmount,
+    required this.createdTime,
+    this.resolutionType,
+    this.resolutionContent,
+    this.resolvedTime,
+  });
+
+  final String complaintNo;
+  final String orderNo;
+  final String complaintType;
+  final String content;
+  final String status;
+  final String? resolutionType;
+  final String? resolutionContent;
+  final String refundAmount;
+  final DateTime? createdTime;
+  final DateTime? resolvedTime;
+
+  bool get resolved => status == 'RESOLVED';
+
+  factory PassengerComplaint.fromJson(Map<String, dynamic> json) =>
+      PassengerComplaint(
+        complaintNo: json['complaintNo'] as String,
+        orderNo: json['orderNo'] as String,
+        complaintType: json['complaintType'] as String? ?? 'OTHER',
+        content: json['content'] as String? ?? '',
+        status: json['status'] as String? ?? 'OPEN',
+        resolutionType: json['resolutionType'] as String?,
+        resolutionContent: json['resolutionContent'] as String?,
+        refundAmount: json['refundAmount']?.toString() ?? '0.00',
+        createdTime: _complaintTime(json['createdTime']),
+        resolvedTime: _complaintTime(json['resolvedTime']),
+      );
+}
+
+class PassengerComplaintPage {
+  const PassengerComplaintPage({
+    required this.page,
+    required this.size,
+    required this.total,
+    required this.records,
+  });
+
+  final int page;
+  final int size;
+  final int total;
+  final List<PassengerComplaint> records;
+
+  factory PassengerComplaintPage.fromJson(Map<String, dynamic> json) =>
+      PassengerComplaintPage(
+        page: (json['page'] as num).toInt(),
+        size: (json['size'] as num).toInt(),
+        total: (json['total'] as num).toInt(),
+        records: (json['records'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(PassengerComplaint.fromJson)
+            .toList(growable: false),
+      );
+}
+
+DateTime? _complaintTime(Object? value) =>
+    value == null ? null : DateTime.tryParse(value.toString());

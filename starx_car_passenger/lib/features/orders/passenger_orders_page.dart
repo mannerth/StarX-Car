@@ -9,6 +9,7 @@ import 'package:starx_car_common/starx_car_common.dart';
 import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
 import 'passenger_order_repository.dart';
+import 'passenger_complaints_page.dart';
 
 final passengerOrdersProvider = FutureProvider.autoDispose
     .family<OrderPage, OrderStatus?>((ref, status) {
@@ -1331,9 +1332,19 @@ class _ComplaintButtonState extends ConsumerState<_ComplaintButton> {
             content: value,
           );
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('投诉已提交，我们会在七天内处理')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('投诉已提交，可在“我的投诉”查看处理进度'),
+            action: SnackBarAction(
+              label: '查看进度',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PassengerComplaintsPage(),
+                ),
+              ),
+            ),
+          ),
+        );
       }
     } on ApiException {
       if (mounted) {

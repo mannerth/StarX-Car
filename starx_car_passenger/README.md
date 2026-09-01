@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-登录、乘客注册、会话恢复、退出、个人资料编辑与修改密码均已对接现有后端；即时叫车支持上下排列的上车地/目的地入口、首次自动定位、地点搜索、推荐路线、报价、创建、订单取消、订单列表/详情、司机位置和服务中高德驾车路线折线。乘客可在 `SCHEDULED`/`PENDING`/`ACCEPTED` 免费取消，在 `DRIVER_ARRIVED` 按订单绑定规则收取到达后取消费，在 `IN_SERVICE` 中途结束并查看服务端结算结果；完成或终止订单支持七天内提交投诉。项目采用 Riverpod 管理登录态；`flutter analyze`、`flutter test` 和 Android debug APK 构建均已通过。认证 Controller 测试覆盖角色会话恢复、匹配登录保存和错误角色拒绝；Repository 契约测试覆盖报价地点序列化（含坐标精度）、状态筛选、取消原因清理和路线位置解析。
+登录、乘客注册、会话恢复、退出、个人资料编辑与修改密码均已对接现有后端；即时叫车支持上下排列的上车地/目的地入口、首次自动定位、地点搜索、推荐路线、报价、创建、订单取消、订单列表/详情、司机位置和服务中高德驾车路线折线。乘客可在 `SCHEDULED`/`PENDING`/`ACCEPTED` 免费取消，在 `DRIVER_ARRIVED` 按订单绑定规则收取到达后取消费，在 `IN_SERVICE` 中途结束并查看服务端结算结果；完成或终止订单支持七天内提交投诉，并可在个人中心查看本人投诉的处理进度、管理员回复和退款结果。项目采用 Riverpod 管理登录态；`flutter analyze`、`flutter test` 和 Android debug APK 构建均已通过。认证 Controller 测试覆盖角色会话恢复、匹配登录保存和错误角色拒绝；Repository 契约测试覆盖报价地点序列化（含坐标精度）、状态筛选、取消原因清理和路线位置解析。
 
 ## 已实现功能
 
@@ -47,6 +47,7 @@
 - 订单完成后，行程详情页展示评价区：未评价时提供 1-5 星选择与可选文字（最多 500 字），调用 `POST /api/orders/{orderNo}/rating` 提交；已评价时只读展示评分、文字与提交时间。
 - 评价仅对本人已完成且未超过 7 天时限的订单开放，一个订单只能评价一次；订单未完成、重复评价或超过时限由服务端返回 409，客户端以 SnackBar 展示错误提示。
 - 个人中心新增「我的评价」入口，通过 `GET /api/passengers/me/ratings` 分页查看本人提交的评价（订单号、星级、文字、时间），支持下拉刷新。
+- 个人中心新增「我的投诉」入口，通过 `GET /api/complaints/me` 分页查看本人投诉；列表展示投诉原因、待处理/处理中/已处理状态、管理员处理方式、文字回复、退款金额和结案时间，支持下拉刷新与继续加载。
 
 ## 工程结构
 
@@ -67,6 +68,7 @@ lib/
     orders/
       passenger_order_repository.dart  报价、即时订单、位置和路线 API
       passenger_orders_page.dart        我的行程、状态/位置轮询、取消和服务中地图
+      passenger_complaints_page.dart    我的投诉、处理进度与管理员回复
 ```
 
 依赖方向保持为 `starx_car_passenger -> starx_car_common`。乘客页面、资料 Repository 和 Riverpod 状态只保留在本项目。
@@ -89,6 +91,7 @@ lib/
 | `POST` | `/api/orders/{orderNo}/cancel` | 到达前免费取消；到达后按订单绑定规则收取取消费 |
 | `POST` | `/api/orders/{orderNo}/terminate` | 服务中途结束并结算 |
 | `POST` | `/api/orders/{orderNo}/complaints` | 订单结束七天内提交投诉 |
+| `GET` | `/api/complaints/me` | 分页查询本人投诉及管理员处理说明、退款结果 |
 | `GET` | `/api/orders/{orderNo}/driver-location` | 查询司机最后位置 |
 | `GET` | `/api/orders/{orderNo}/route-context` | 获取服务中路线起点和目的地 |
 

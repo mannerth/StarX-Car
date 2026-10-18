@@ -102,7 +102,7 @@ public final class StarxCarCommonPlugin implements FlutterPlugin, MethodChannel.
         if (result == null || activity == null) {
             return false;
         }
-        boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        boolean granted = hasLocationPermission();
         if (granted) {
             result.success("granted");
             return true;
@@ -221,7 +221,9 @@ public final class StarxCarCommonPlugin implements FlutterPlugin, MethodChannel.
             return;
         }
         pendingPermissionResult = result;
-        activity.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+        // Android 12+ requires coarse and fine in the same request to offer precise location.
+        activity.requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,
+                        Manifest.permission.ACCESS_FINE_LOCATION},
                 LOCATION_PERMISSION_REQUEST);
     }
 
@@ -233,8 +235,6 @@ public final class StarxCarCommonPlugin implements FlutterPlugin, MethodChannel.
             return true;
         }
         return activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED
-                || activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
     }
 

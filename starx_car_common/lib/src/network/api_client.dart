@@ -62,6 +62,21 @@ class ApiClient {
   final SessionStore _store;
   Future<AuthSession?>? _refreshing;
 
+  /// Reuses the HTTP session and refresh lock for authenticated transports.
+  Future<String?> accessToken({bool refresh = false}) async {
+    if (!refresh) return (await _store.read())?.accessToken;
+    try {
+      return (await _refreshSession())?.accessToken;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 401 ||
+          error.response?.statusCode == 403) {
+        await _store.clear();
+        throw const ApiException('登录状态已过期，请重新登录。', statusCode: 401);
+      }
+      rethrow;
+    }
+  }
+
   Future<dynamic> get(
     String path, {
     Map<String, dynamic>? queryParameters,

@@ -123,6 +123,21 @@ public class AMapLocationClientImpl implements AMapLocationListener {
         if (optionMap.containsKey("onceLocation")) {
             locationOption.setOnceLocation((boolean) optionMap.get("onceLocation"));
         }
+        if (optionMap.containsKey("onceLocationLatest")) {
+            locationOption.setOnceLocationLatest((boolean) optionMap.get("onceLocationLatest"));
+        }
+        if (optionMap.containsKey("locationCacheEnable")) {
+            locationOption.setLocationCacheEnable((boolean) optionMap.get("locationCacheEnable"));
+        }
+        if (optionMap.containsKey("gpsFirst")) {
+            locationOption.setGpsFirst((boolean) optionMap.get("gpsFirst"));
+        }
+        if (optionMap.containsKey("gpsFirstTimeout")) {
+            locationOption.setGpsFirstTimeout(((Number) optionMap.get("gpsFirstTimeout")).longValue());
+        }
+        if (optionMap.containsKey("offset")) {
+            locationOption.setOffset((boolean) optionMap.get("offset"));
+        }
 
         if (null != locationClient) {
             locationClient.setLocationOption(locationOption);

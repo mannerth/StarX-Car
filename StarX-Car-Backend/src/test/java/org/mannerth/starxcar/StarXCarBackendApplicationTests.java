@@ -90,6 +90,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class StarXCarBackendApplicationTests {
 
+    @Test
+    void documentsRealtimeProtocol() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/realtime'].get.operationId").value("connectRealtime"))
+                .andExpect(jsonPath("$.paths['/api/realtime'].get.responses['101']").exists());
+    }
+
     @Autowired
     private MockMvc mockMvc;
 

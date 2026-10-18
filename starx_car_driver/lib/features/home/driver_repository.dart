@@ -50,6 +50,7 @@ class DriverRepository {
     double? speedMps,
     double? bearing,
     CancelToken? cancelToken,
+    RealtimeClient? realtime,
   }) async {
     if (point.coordinateSystem != CoordinateSystem.gcj02) {
       throw StateError('司机位置上报必须使用 GCJ-02 坐标。');
@@ -57,20 +58,25 @@ class DriverRepository {
     final apiAccuracyM = _apiOptionalDecimal(accuracyM, min: 0, max: 10000);
     final apiSpeedMps = _apiOptionalDecimal(speedMps, min: 0, max: 100);
     final apiBearing = _apiOptionalDecimal(bearing, min: 0, max: 360);
-    await _api.put(
-      '/drivers/me/location',
-      data: {
-        // The API and its DECIMAL(10,6) storage accept at most six
-        // fractional digits. AMap may return more precision on some devices.
-        'latitude': _apiCoordinate(point.latitude),
-        'longitude': _apiCoordinate(point.longitude),
-        ...?apiAccuracyM == null ? null : {'accuracyM': apiAccuracyM},
-        ...?apiSpeedMps == null ? null : {'speedMps': apiSpeedMps},
-        ...?apiBearing == null ? null : {'bearing': apiBearing},
-        'recordedTime': _formatBackendTime(recordedTime),
-      },
-      cancelToken: cancelToken,
-    );
+    final data = <String, dynamic>{
+      // The API and its DECIMAL(10,6) storage accept at most six
+      // fractional digits. AMap may return more precision on some devices.
+      'latitude': _apiCoordinate(point.latitude),
+      'longitude': _apiCoordinate(point.longitude),
+      ...?apiAccuracyM == null ? null : {'accuracyM': apiAccuracyM},
+      ...?apiSpeedMps == null ? null : {'speedMps': apiSpeedMps},
+      ...?apiBearing == null ? null : {'bearing': apiBearing},
+      'recordedTime': _formatBackendTime(recordedTime),
+    };
+    if (realtime != null) {
+      await realtime.request('driver.location', data);
+    } else {
+      await _api.put(
+        '/drivers/me/location',
+        data: data,
+        cancelToken: cancelToken,
+      );
+    }
   }
 
   Future<OrderPage> pendingOrders({

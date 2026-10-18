@@ -9,17 +9,15 @@ import 'package:starx_car_common/starx_car_common.dart';
 import '../auth/auth_controller.dart';
 import '../home/driver_repository.dart';
 import 'driver_work_controller.dart';
+import 'order_realtime.dart';
 
-final driverOrderDetailProvider = FutureProvider.autoDispose
+final driverOrderDetailProvider = StreamProvider.autoDispose
     .family<OrderDetail, String>((ref, orderNo) {
       ref.watch(driverAuthProvider);
-      final cancelToken = CancelToken();
-      ref.onDispose(
-        () => cancelToken.cancel('driver order detail provider disposed'),
-      );
       return ref
-          .read(driverRepositoryProvider)
-          .detail(orderNo, cancelToken: cancelToken);
+          .watch(driverRealtimeProvider)
+          .watch('order.detail', orderNo)
+          .map(OrderDetail.fromJson);
     });
 
 /// Key for the driver order map route planner. The status and coordinates are
@@ -157,26 +155,6 @@ class DriverOrderDetailPage extends ConsumerStatefulWidget {
 
 class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
   bool _busy = false;
-  Timer? _refreshTimer;
-  OrderStatus? _lastStatus;
-
-  @override
-  void initState() {
-    super.initState();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      final status = _lastStatus;
-      if (status == null || !_isActive(status)) return;
-      ref.invalidate(driverOrderDetailProvider(widget.orderNo));
-      ref.invalidate(driverOrdersProvider);
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final detail = ref.watch(driverOrderDetailProvider(widget.orderNo));
@@ -190,7 +168,6 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
               ref.invalidate(driverOrderDetailProvider(widget.orderNo)),
         ),
         data: (order) {
-          _lastStatus = order.status;
           return _content(order);
         },
       ),
@@ -624,11 +601,6 @@ class _DriverOrderDetailPageState extends ConsumerState<DriverOrderDetailPage> {
     context,
   ).showSnackBar(SnackBar(content: Text(message)));
 }
-
-bool _isActive(OrderStatus status) =>
-    status == OrderStatus.accepted ||
-    status == OrderStatus.driverArrived ||
-    status == OrderStatus.inService;
 
 class _DriverOrderMap extends ConsumerWidget {
   const _DriverOrderMap({required this.order});

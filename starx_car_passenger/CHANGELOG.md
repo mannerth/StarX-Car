@@ -125,3 +125,24 @@
 
 - Configure the Android package ID as `org.mannerth.starxcar.passenger` and connect the release build to the local shared signing certificate.
 - Document the passenger-app responsibility boundary, including ride-hailing, trip, payment and evaluation workflows, and its dependency on `starx_car_common`.
+
+## 2026-10-16 课程报告运行验证
+
+- 通过项目 FVM 在 emulator-5554 构建并运行 Android App，使用现有测试账号完成地点搜索、路线报价、下单、状态查看、结算和五星评价，采集课程报告截图。
+- 演示单 O2026101622515750400000 预估 9.60 元，实际结算 8.40 元；重新启动 App 恢复会话后获取余额 273.20 元，与数据库一致。原会话个人中心曾保留结算前 281.60 元缓存，本次记录现象，未修改刷新逻辑。
+
+## 2026-10-18：行程推送与重新定位修复
+
+- 详情、接驾位置和服务中路线上下文由 HTTP 循环读取改为 WebSocket 快照；终态和页面释放取消订阅，列表响应订单变化/重连事件。
+- 列表读取期间合并到达的订单通知，保留在途读取并在结束后补取一次，避免连续事件导致加载饥饿。
+- 维持路线重规划、错误和 stale 展示；点击重新定位更新自动上车点，修复地图与上车点仍使用旧坐标不一致的问题，细化精确定位授权提示。
+- 原轮询测试替换为推送状态变化和完成后停止监听测试；README 同步协议、路线事件与定位行为。
+- 验证：FVM Flutter 静态检查无问题，20 项测试通过，Android debug APK 构建通过。
+
+## 2026-10-18：修复服务中路线在订单结束时抛出异常
+
+- 根因：状态推进后旧路线订阅仍有刷新窗口，后端状态 409 进入 await-for 并抛出“订单当前不可获取路线规划上下文”。改为消费正常订阅结束，兼容旧服务端仅在 order.route/order.location 返回的阶段 409。
+- 新增页面生命周期绑定的订阅桥接：页面销毁时立即取消 WebSocket 监听，不等待高德单次定位/路线规划完成；移除已不控制任何请求的遗留 CancelToken。
+- 保留真实权限/服务错误处理、终态详情和结算展示；新增旧协议阶段结束、真实错误仍透传、消费者暂停时释放订阅的回归测试，更新 README。
+- 验证：静态检查无问题，乘客端 24 项测试通过。
+- 更新后的 Android debug APK 构建通过；正常结束订单的界面切换由回归测试验证，未操作线上订单。

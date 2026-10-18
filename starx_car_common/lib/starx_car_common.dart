@@ -17,8 +17,7 @@ export 'src/map/amap_search.dart';
 export 'src/network/api_response.dart';
 export 'src/network/api_client.dart';
 export 'src/network/api_exception.dart';
+export 'src/network/realtime_client.dart';
 export 'src/models/order_models.dart';
 export 'src/models/wallet_models.dart';
 export 'src/network/wallet_api.dart';
-
-

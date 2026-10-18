@@ -39,7 +39,7 @@ public class PassengerTripLocationController {
 
     @GetMapping("/api/orders/{orderNo}/driver-location")
     @PreAuthorize("hasRole('PASSENGER')")
-    @Operation(summary = "查看订单司机最新位置", description = "仅限订单乘客；仅在 ACCEPTED、DRIVER_ARRIVED 或 IN_SERVICE 状态返回与该订单关联的司机最后 GCJ-02 位置。建议客户端每 3 至 5 秒轮询；位置超过保鲜窗口时返回 stale=true，不伪造新位置。")
+    @Operation(summary = "查看订单司机最新位置", description = "仅限订单乘客；仅在 ACCEPTED、DRIVER_ARRIVED 或 IN_SERVICE 状态返回与该订单关联的司机最后 GCJ-02 位置。用于首次查询或手动刷新，实时更新订阅 /api/realtime 的 order.location；位置超过保鲜窗口时返回 stale=true，不伪造新位置。")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "查询成功"), @ApiResponse(responseCode = "401", description = "未登录"), @ApiResponse(responseCode = "403", description = "非乘客角色或账号不可用"), @ApiResponse(responseCode = "404", description = "订单不存在、不属于当前乘客或暂无与订单关联的位置"), @ApiResponse(responseCode = "409", description = "订单状态暂不允许查看司机位置")})
     public DriverLocationResponse driverLocation(@AuthenticationPrincipal String principal, @PathVariable String orderNo) {
         return tripLocationService.getDriverLocation(requireActivePassenger(principal), orderNo);

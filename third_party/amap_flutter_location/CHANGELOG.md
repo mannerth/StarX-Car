@@ -1,5 +1,7 @@
 ## Unreleased
 
+- 2026-10-18：Android 透传近期最佳结果、定位缓存、GPS 优先/等待时间和 GCJ-02 偏移参数；Dart 选项保留兼容默认值，供 common 明确控制高精度定位。README 补充参数与 5 秒 GPS 等待的使用方式。
+
 - 更新本地 vendor 包的发布与 SDK 约束，明确由 StarX-Car 使用 Flutter 3.44/Dart 3.12 维护；未改变插件运行行为。
 
 ## 【3.0.0】- 2021-11-23

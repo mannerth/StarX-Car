@@ -1,4 +1,8 @@
-##  前述 
+## StarX-Car Android 定位选项（2026-10-18）
+
+本地适配新增 `onceLocationLatest`、`locationCacheEnable`、`gpsFirst`、`gpsFirstTimeout` 和 `offset`，分别透传高德近期最佳结果、缓存开关、GPS 优先、GPS 等待超时及 GCJ-02 偏移。插件默认行为保持兼容；common 在单次定位时设置 GPS 最长等待 5 秒，避免 SDK 默认等待 30 秒超过页面 15 秒超时，同时关闭缓存并启用近期最佳结果。只维护 Android 行为。
+
+##  前述
 
 1. 高德定位Flutter插件
 2. 登录[高德开放平台官网](https://lbs.amap.com/api/)分别申请[Android端](https://lbs.amap.com/api/android-location-sdk/guide/create-project/get-key/)和[iOS端](https://lbs.amap.com/api/ios-location-sdk/guide/create-project/get-key)的key

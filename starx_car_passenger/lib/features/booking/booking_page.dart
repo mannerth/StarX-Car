@@ -54,9 +54,9 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
       case LocationPermissionStatus.granted:
         await _locate(initial: true);
       case LocationPermissionStatus.denied:
-        _showMessage('未获得定位权限，将无法自动定位当前位置，可在页面右下角重试。');
+        _showMessage('请允许精确定位；仅开启大致位置无法准确确定上车点。');
       case LocationPermissionStatus.permanentlyDenied:
-        _showMessage('定位权限已被永久拒绝，请到系统设置中开启定位权限。');
+        _showMessage('请到系统设置中开启定位权限，并选择精确位置。');
     }
   }
 
@@ -119,7 +119,7 @@ class _PassengerBookingPageState extends ConsumerState<PassengerBookingPage> {
       setState(() {
         _mapCenter = point;
         _hasSearchCenter = true;
-        _pickup ??= place;
+        if (!initial || _pickup == null) _pickup = place;
         _quote = null;
       });
       unawaited(_planRoute());

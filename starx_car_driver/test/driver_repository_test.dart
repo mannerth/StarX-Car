@@ -2,7 +2,37 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:starx_car_common/starx_car_common.dart';
 import 'package:starx_car_driver/features/home/driver_repository.dart';
 
+class RecordingRealtime extends RealtimeClient {
+  RecordingRealtime(ApiClient api)
+    : super(baseUrl: 'http://test/api', api: api);
+  String? type;
+  Map<String, dynamic>? data;
+  @override
+  Future<void> request(String type, Map<String, dynamic> data) async {
+    this.type = type;
+    this.data = data;
+  }
+}
+
 void main() {
+  test(
+    'workbench location uses WebSocket with API decimal precision',
+    () async {
+      final api = RecordingApiClient({});
+      final realtime = RecordingRealtime(api);
+      await DriverRepository(api).reportLocation(
+        point: const GeoPoint(latitude: 31.23456789, longitude: 121.45678912),
+        recordedTime: DateTime(2026, 10, 18, 12),
+        accuracyM: 8.567,
+        realtime: realtime,
+      );
+      expect(realtime.type, 'driver.location');
+      expect(realtime.data?['latitude'], 31.234568);
+      expect(realtime.data?['longitude'], 121.456789);
+      expect(realtime.data?['accuracyM'], 8.57);
+      expect(api.calls, isEmpty);
+    },
+  );
   test("getCar follows driver.carId across the driver's bound cars", () async {
     final api = RecordingApiClient({
       'GET /drivers/me': {'carId': 22},

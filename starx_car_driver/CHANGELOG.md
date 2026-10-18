@@ -135,3 +135,16 @@
 
 - Configure the Android package ID as `org.mannerth.starxcar.driver` and connect the release build to the local shared signing certificate.
 - Document the driver-app responsibility boundary, including work status, order handling, navigation, location reporting and income workflows, and its dependency on `starx_car_common`.
+
+## 2026-10-16 课程报告运行验证
+
+- 通过项目 FVM 在 emulator-5556 构建并运行 Android App，完成位置/通知授权、上线听单、抢单、到达、手机尾号核验、开始服务和完成结算，采集课程报告截图。
+- 演示单 O2026101622515750400000 结算 8.40 元，可提现收入 207.80 元，与账本及管理端一致。完成后通过 App 收车，保留应用运行。两端首次并行构建遇到共用 Kotlin 缓存冲突，改为依次构建后成功，未修改源代码。
+
+## 2026-10-18：实时听单与位置上报
+
+- 待抢/本人订单改为事件查询，详情改为本人订单快照，移除 5 秒/3 秒读取计时器；上线状态恢复后加载待抢订单。
+- 推送突发时保留在途列表请求，结束后仅补读一次；新增回归测试，避免慢网下每次事件都取消请求而持续加载。
+- 定位回调使用 driver.location/ack，保留最新点串行与失败退避；过滤过期点并阻止停止任务重试，保持原数值精度契约和司机前台服务职责。
+- 新增 WebSocket 上报数值精度与不发送 HTTP 的测试，移除废弃轮询辅助测试，更新 README。
+- 验证：FVM Flutter 静态检查无问题，15 项测试通过，Android debug APK 构建通过。

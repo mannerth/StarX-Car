@@ -44,7 +44,7 @@ http.interceptors.response.use(
   },
 )
 
-async function refreshAccessToken(): Promise<string> {
+export async function refreshAccessToken(): Promise<string> {
   if (!refreshRequest) {
     const refreshToken = localStorage.getItem('starx-car-admin-refresh-token')
     if (!refreshToken) return Promise.reject(new Error('缺少刷新令牌'))

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:starx_car_common/starx_car_common.dart';
 import '../auth/auth_controller.dart';
 import '../home/driver_repository.dart';
+import 'order_realtime.dart';
 
 final driverWorkProvider = AsyncNotifierProvider<DriverWorkController, bool>(
   DriverWorkController.new,
@@ -17,8 +18,6 @@ class DriverWorkController extends AsyncNotifier<bool> {
   );
   AmapLocationService? _location;
   StreamSubscription<AmapLocationUpdate>? _locationSubscription;
-  Timer? _pendingTimer;
-  Timer? _driverOrdersTimer;
   Timer? _locationRetryTimer;
   AmapLocationUpdate? _pendingLocation;
   bool _sendingLocation = false;
@@ -32,6 +31,7 @@ class DriverWorkController extends AsyncNotifier<bool> {
   @override
   Future<bool> build() async {
     ref.watch(driverAuthProvider);
+    ref.watch(driverRealtimeProvider);
     ref.onDispose(_disposeTasks);
     final driver = await ref.read(driverRepositoryProvider).getDriver();
     final online =
@@ -89,21 +89,8 @@ class DriverWorkController extends AsyncNotifier<bool> {
       _pendingLocation = update;
       unawaited(_drainLocationQueue(repo, cancelToken));
     });
-    // 2 秒上报一次最新位置，配合乘客端 2 秒轮询，保证行程中司机位置更新及时。
+    // 定位回调经 WebSocket 上报，订单列表由服务端事件触发刷新。
     _location!.start(interval: const Duration(seconds: 2));
-    _pendingTimer ??= Timer.periodic(const Duration(seconds: 5), (_) {
-      if (shouldStartOrderRefresh(ref.read(pendingOrdersProvider))) {
-        ref.invalidate(pendingOrdersProvider);
-      }
-    });
-    // A passenger can cancel after the driver accepts the order. Keep the
-    // active-order list in sync with that server-side transition as well as
-    // the pending-order list, so the workbench recovers without re-entering.
-    _driverOrdersTimer ??= Timer.periodic(const Duration(seconds: 5), (_) {
-      if (shouldStartOrderRefresh(ref.read(driverOrdersProvider))) {
-        ref.invalidate(driverOrdersProvider);
-      }
-    });
   }
 
   void _disposeTasks() {
@@ -115,10 +102,6 @@ class DriverWorkController extends AsyncNotifier<bool> {
   }
 
   void _pauseTasks() {
-    _pendingTimer?.cancel();
-    _pendingTimer = null;
-    _driverOrdersTimer?.cancel();
-    _driverOrdersTimer = null;
     _locationRetryTimer?.cancel();
     _locationRetryTimer = null;
     _pendingLocation = null;
@@ -181,26 +164,30 @@ class DriverWorkController extends AsyncNotifier<bool> {
     DriverRepository repo,
     CancelToken cancelToken,
   ) async {
+    if (!identical(_locationCancelToken, cancelToken)) return;
     if (_sendingLocation) return;
     final update = _pendingLocation;
     if (update?.point == null) return;
     _pendingLocation = null;
+    if (!update!.isUsable()) return;
     _sendingLocation = true;
     try {
       await repo
           .reportLocation(
-            point: update!.point!,
+            point: update.point!,
             recordedTime: update.recordedTime ?? DateTime.now(),
             accuracyM: update.accuracyM,
             speedMps: update.speedMps,
             bearing: update.bearing,
             cancelToken: cancelToken,
+            realtime: ref.read(driverRealtimeProvider),
           )
           .timeout(const Duration(seconds: 8));
       _locationFailureCount = 0;
       _locationRetryTimer?.cancel();
       _locationRetryTimer = null;
     } on Object catch (error) {
+      if (!identical(_locationCancelToken, cancelToken)) return;
       if (error is ApiException && error.cancelled) return;
       // Keep the newest callback if one arrived while this request was in
       // flight; otherwise retry the failed point once connectivity returns.
@@ -219,6 +206,7 @@ class DriverWorkController extends AsyncNotifier<bool> {
   }
 
   void _scheduleLocationRetry(DriverRepository repo, CancelToken cancelToken) {
+    if (!identical(_locationCancelToken, cancelToken)) return;
     if (_locationRetryTimer != null) return;
     final seconds = (1 << (_locationFailureCount.clamp(0, 5))).clamp(1, 30);
     _locationRetryTimer = Timer(Duration(seconds: seconds), () {
@@ -229,29 +217,29 @@ class DriverWorkController extends AsyncNotifier<bool> {
   }
 }
 
-@visibleForTesting
-bool shouldStartOrderRefresh(AsyncValue<OrderPage> state) => !state.isLoading;
-
 final pendingOrdersProvider = FutureProvider.autoDispose<OrderPage>((ref) {
   ref.watch(driverAuthProvider);
-  // Do not watch driverWorkProvider here: driverWorkProvider owns the timer
-  // that invalidates this provider, and watching it creates a Riverpod cycle
-  // while both providers are being initialized. Work-status changes explicitly
-  // invalidate pendingOrdersProvider after the mutation completes.
-  final online = ref.read(driverWorkProvider).value ?? false;
+  // Work status and pushed changes both invalidate this query; no refresh timer.
+  final online = ref.watch(driverWorkProvider).value ?? false;
   if (!online) {
     return const OrderPage(page: 1, size: 20, total: 0, records: []);
   }
   final cancelToken = CancelToken();
   ref.onDispose(() => cancelToken.cancel('pending orders provider disposed'));
-  return ref
-      .read(driverRepositoryProvider)
-      .pendingOrders(cancelToken: cancelToken);
+  return driverOrderQuery(
+    ref,
+    () => ref
+        .read(driverRepositoryProvider)
+        .pendingOrders(cancelToken: cancelToken),
+  );
 });
 
 final driverOrdersProvider = FutureProvider.autoDispose<OrderPage>((ref) {
   ref.watch(driverAuthProvider);
   final cancelToken = CancelToken();
   ref.onDispose(() => cancelToken.cancel('driver orders provider disposed'));
-  return ref.read(driverRepositoryProvider).orders(cancelToken: cancelToken);
+  return driverOrderQuery(
+    ref,
+    () => ref.read(driverRepositoryProvider).orders(cancelToken: cancelToken),
+  );
 });

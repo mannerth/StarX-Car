@@ -10,6 +10,7 @@ import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
 import 'passenger_order_repository.dart';
 import 'passenger_complaints_page.dart';
+import 'order_realtime.dart';
 
 final passengerOrdersProvider = FutureProvider.autoDispose
     .family<OrderPage, OrderStatus?>((ref, status) {
@@ -18,46 +19,27 @@ final passengerOrdersProvider = FutureProvider.autoDispose
       ref.onDispose(
         () => cancelToken.cancel('passenger orders provider disposed'),
       );
-      return ref
-          .read(passengerOrderRepositoryProvider)
-          .list(status: status, cancelToken: cancelToken);
+      return passengerOrderQuery(
+        ref,
+        () => ref
+            .read(passengerOrderRepositoryProvider)
+            .list(status: status, cancelToken: cancelToken),
+      );
     });
-
-final passengerOrderDetailPollIntervalProvider = Provider<Duration>(
-  (ref) => const Duration(seconds: 4),
-);
 
 final passengerOrderDetailProvider = StreamProvider.autoDispose
     .family<OrderDetail, String>((ref, orderNo) async* {
       ref.watch(passengerAuthProvider);
-      final repository = ref.read(passengerOrderRepositoryProvider);
-      final cancelToken = CancelToken();
-      ref.onDispose(() => cancelToken.cancel('order detail provider disposed'));
-      var failureCount = 0;
-      while (true) {
-        await _waitForForeground();
-        late final OrderDetail detail;
-        try {
-          detail = await repository.detail(orderNo, cancelToken: cancelToken);
-          failureCount = 0;
-        } on ApiException catch (error) {
-          if (error.cancelled) return;
-          if (error.statusCode == 404 || error.statusCode == 409) rethrow;
-          failureCount++;
-          if (failureCount >= _maxPollingFailures) rethrow;
-          await _pollRetryDelay(failureCount);
-          continue;
-        } on Object {
-          failureCount++;
-          if (failureCount >= _maxPollingFailures) rethrow;
-          await _pollRetryDelay(failureCount);
-          continue;
-        }
+      final realtime = ref.watch(passengerRealtimeProvider);
+      await for (final data in passengerOrderSnapshots(
+        ref,
+        realtime,
+        'order.detail',
+        orderNo,
+      )) {
+        final detail = OrderDetail.fromJson(data);
         yield detail;
         if (_isTerminalOrderStatus(detail.status)) return;
-        await Future<void>.delayed(
-          ref.read(passengerOrderDetailPollIntervalProvider),
-        );
       }
     });
 
@@ -101,12 +83,10 @@ class _PassengerApproachData {
 final passengerApproachProvider = StreamProvider.autoDispose
     .family<_PassengerApproachData, _ApproachRequest>((ref, request) async* {
       ref.watch(passengerAuthProvider);
-      final repository = ref.read(passengerOrderRepositoryProvider);
+      final realtime = ref.watch(passengerRealtimeProvider);
       final routeService = const AmapRouteService();
-      final cancelToken = CancelToken();
       final locationService = AmapLocationService();
       ref.onDispose(() {
-        cancelToken.cancel('approach provider disposed');
         unawaited(locationService.dispose());
       });
       final pickup = GeoPoint(
@@ -125,9 +105,12 @@ final passengerApproachProvider = StreamProvider.autoDispose
       AmapWalkingRoute? walkingRoute;
       String? walkingRouteError;
       String? locationError;
-      var failureCount = 0;
-      while (true) {
-        await _waitForForeground();
+      await for (final data in passengerOrderSnapshots(
+        ref,
+        realtime,
+        'order.location',
+        request.orderNo,
+      )) {
         if (!located && !locating) {
           locating = true;
           try {
@@ -145,26 +128,7 @@ final passengerApproachProvider = StreamProvider.autoDispose
           }
           located = true;
         }
-        late final DriverLocation driverLocation;
-        try {
-          driverLocation = await repository.driverLocation(
-            request.orderNo,
-            cancelToken: cancelToken,
-          );
-          failureCount = 0;
-        } on ApiException catch (error) {
-          if (error.cancelled) return;
-          if (error.statusCode == 404 || error.statusCode == 409) return;
-          failureCount++;
-          if (failureCount >= _maxPollingFailures) rethrow;
-          await _pollRetryDelay(failureCount);
-          continue;
-        } on Object {
-          failureCount++;
-          if (failureCount >= _maxPollingFailures) rethrow;
-          await _pollRetryDelay(failureCount);
-          continue;
-        }
+        final driverLocation = DriverLocation.fromJson(data);
         final now = DateTime.now();
         final driverDistanceMoved = plannedDriverOrigin == null
             ? double.infinity
@@ -227,7 +191,6 @@ final passengerApproachProvider = StreamProvider.autoDispose
           locationError: locationError,
           nearPickup: nearPickup,
         );
-        await Future<void>.delayed(_passengerLocationPollInterval);
       }
     });
 
@@ -246,39 +209,19 @@ final passengerRouteContextProvider = FutureProvider.autoDispose
 final passengerTripRouteProvider = StreamProvider.autoDispose
     .family<_PassengerRouteData, String>((ref, orderNo) async* {
       ref.watch(passengerAuthProvider);
-      final repository = ref.read(passengerOrderRepositoryProvider);
+      final realtime = ref.watch(passengerRealtimeProvider);
       final routeService = const AmapRouteService();
-      final cancelToken = CancelToken();
-      ref.onDispose(
-        () => cancelToken.cancel('route context provider disposed'),
-      );
       GeoPoint? plannedOrigin;
       DateTime? plannedAt;
       AmapDrivingRoute? route;
       String? routeError;
-      var contextFailureCount = 0;
-      while (true) {
-        await _waitForForeground();
-        late final RouteContext context;
-        try {
-          context = await repository.routeContext(
-            orderNo,
-            cancelToken: cancelToken,
-          );
-          contextFailureCount = 0;
-        } on ApiException catch (error) {
-          if (error.cancelled) return;
-          if (error.statusCode == 404 || error.statusCode == 409) rethrow;
-          contextFailureCount++;
-          if (contextFailureCount >= _maxPollingFailures) rethrow;
-          await _pollRetryDelay(contextFailureCount);
-          continue;
-        } on Object {
-          contextFailureCount++;
-          if (contextFailureCount >= _maxPollingFailures) rethrow;
-          await _pollRetryDelay(contextFailureCount);
-          continue;
-        }
+      await for (final data in passengerOrderSnapshots(
+        ref,
+        realtime,
+        'order.route',
+        orderNo,
+      )) {
+        final context = RouteContext.fromJson(data);
         final now = DateTime.now();
         final distanceMoved = plannedOrigin == null
             ? double.infinity
@@ -286,7 +229,7 @@ final passengerTripRouteProvider = StreamProvider.autoDispose
         final secondsSincePlan = plannedAt == null
             ? double.infinity
             : now.difference(plannedAt).inSeconds;
-        // 司机位置每 2 秒轮询；路线在司机移动超过一定距离或超过间隔后重规划，
+        // 司机位置通过 WebSocket 推送；路线在司机移动超过阈值后重规划，
         // 上次规划失败且暂无路线时每 5 秒自动重试，大范围移动后尽快刷新路线与视野。
         final shouldRefresh = route == null
             ? plannedAt == null || secondsSincePlan >= 5
@@ -310,7 +253,6 @@ final passengerTripRouteProvider = StreamProvider.autoDispose
           route: route,
           routeError: routeError,
         );
-        await Future<void>.delayed(_passengerLocationPollInterval);
       }
     });
 
@@ -921,7 +863,7 @@ class _RoutePanel extends ConsumerWidget {
               ],
               markerColors: [Colors.blue, Colors.red.shade700],
               routePoints: value.route?.points ?? const [],
-              // 视野跟随司机当前位置与目的地，位置每次轮询更新后地图立即重绘。
+              // 视野跟随司机当前位置与目的地，每次收到位置推送后地图立即重绘。
               viewportPoints: [
                 value.context.driverLocation.point,
                 value.context.destination.location,
@@ -1116,12 +1058,6 @@ bool _isTerminalOrderStatus(OrderStatus status) =>
 bool _isComplaintEligible(OrderStatus status) =>
     status == OrderStatus.completed || status == OrderStatus.terminated;
 
-const _maxPollingFailures = 3;
-
-/// Passenger-side driver location poll interval for the approach and trip
-/// panels. Kept short so a moving driver position is reflected promptly.
-const _passengerLocationPollInterval = Duration(seconds: 2);
-
 /// Re-plan the driving route when the driver has moved this far from the
 /// origin used by the last plan, or after this many seconds, so the route
 /// line and map viewport follow the driver's current position.
@@ -1129,11 +1065,6 @@ const _routeRefreshDistanceM = 50;
 const _routeRefreshSeconds = 5;
 const _approachDriverRefreshDistanceM = 50;
 const _approachDriverRefreshSeconds = 3;
-
-Future<void> _pollRetryDelay(int failureCount) async {
-  final exponent = math.min(failureCount - 1, 4);
-  await Future<void>.delayed(Duration(seconds: 1 << exponent));
-}
 
 double _distanceM(GeoPoint first, GeoPoint second) {
   const earthRadiusM = 6371000.0;
@@ -1149,16 +1080,6 @@ double _distanceM(GeoPoint first, GeoPoint second) {
           math.sin(dLng / 2));
   return earthRadiusM * 2 * math.asin(math.sqrt(a.clamp(0, 1)));
 }
-
-Future<void> _waitForForeground() async {
-  while (!_isForeground) {
-    await Future<void>.delayed(const Duration(seconds: 1));
-  }
-}
-
-bool get _isForeground =>
-    WidgetsBinding.instance.lifecycleState == null ||
-    WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
 
 /// 已完成订单的评价区：已评价时只读展示，未评价时提供 1-5 星与可选文字输入。
 class _RatingPanel extends ConsumerStatefulWidget {

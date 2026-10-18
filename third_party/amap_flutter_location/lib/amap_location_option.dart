@@ -15,6 +15,13 @@ class AMapLocationOption {
   ///默认值：false
   bool onceLocation = false;
 
+  /// Android: choose the most accurate fix in the recent three-second window.
+  bool onceLocationLatest = false;
+  bool locationCacheEnable = true;
+  bool gpsFirst = false;
+  int gpsFirstTimeout = 30000;
+  bool offset = true;
+
   ///Android端定位模式, 只在Android系统上有效<br>
   ///默认值：[AMapLocationMode.Hight_Accuracy]<br>
   ///可选值：<br>
@@ -75,6 +82,11 @@ class AMapLocationOption {
       "locationMode": locationMode.index,
       "geoLanguage": geoLanguage.index,
       "onceLocation": onceLocation,
+      "onceLocationLatest": onceLocationLatest,
+      "locationCacheEnable": locationCacheEnable,
+      "gpsFirst": gpsFirst,
+      "gpsFirstTimeout": gpsFirstTimeout,
+      "offset": offset,
       "pausesLocationUpdatesAutomatically": pausesLocationUpdatesAutomatically,
       "desiredAccuracy": desiredAccuracy.index,
       'distanceFilter': distanceFilter,

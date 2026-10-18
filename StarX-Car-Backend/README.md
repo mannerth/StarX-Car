@@ -322,7 +322,15 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - 请求支持并返回 `X-Trace-Id`；响应体也会带 `traceId`，可用于日志定位。
 - 认证、权限、参数校验、唯一约束等错误返回统一 JSON 结构，不返回密码、JWT、数据库异常详情或堆栈。
 
-## 当前未实现的业务
 
-项目根目录描述了网约车课程设计的完整目标。即时叫车与预约叫车已完成报价、下单、抢单、订单状态流转、HTTP 轮询司机位置、服务中路线规划上下文、最终结算、管理员计价规则管理和预约定时派单；仍未实现自动派单、轨迹历史、支付/退款、收入统计和调度规则。
+## WebSocket 实时通道
 
+- 地址 `ws(s)://<后端地址>/api/realtime`；握手后 10 秒内发送 `{"type":"auth","token":"<accessToken>"}`，成功返回 `ready`。仅接受 access JWT 和 active 账号；Token 不进 URL。JWT 过期关闭码为 `1008`，账号不可用为 `1003`。完整协议同时列入 Swagger/OpenAPI。
+- 订阅消息为 `{"type":"subscribe","topic":"order.detail","orderNo":"<订单号>"}`；取消订阅使用相同字段、`type=unsubscribe`。乘客/司机只能订阅本人订单。乘客另可订阅 `order.location`（接驾/已到达/服务中）、`order.route`（服务中），每连接最多 16 个订阅。
+- 快照为 `{"type":"snapshot","topic":"...","orderNo":"...","data":{...}}`，复用对应 HTTP DTO；订阅错误使用 `subscription.error/code/message`。首次位置尚未产生时返回 `404/transient=true`，保留订阅等待下一次上报。
+- 订单完成、取消、终止等状态变化导致位置/路线不再可见时，服务端移除对应订阅并发送 `subscription.closed/topic/orderNo/reason=resource_state_changed/code=409`。这是正常结束，订单详情订阅和连接继续工作；首次订阅与状态推进发生竞争时采用相同行为。越权、鉴权和服务错误仍通过错误消息处理。
+- 司机位置消息为 `{"type":"driver.location","id":"<请求ID>","data":{...}}`，data 与原 `DriverLocationRequest` 一致。司机身份来自 JWT，字段验证与账号/审核/出车状态沿用现有服务，成功返回 `ack/id`，失败返回 `error/id/code/message`。原 HTTP 位置接口保留供兼容用途。
+- 订单创建、抢单、取消、到达、开始、完成、终止、支付/退款、预约自动派单及管理员订单写操作成功提交后，推送不含订单号、手机号、位置的 `orders.changed`，并刷新已授权的详情订阅。位置写入后仅刷新订阅该司机的乘客位置/路线；管理员额外接收 `location.changed` 后读取现有位置接口。
+- 客户端每 20 秒发送 `ping`，服务端回复 `pong`；75 秒无心跳或 JWT 到期则关闭。客户端重连后重新鉴权、恢复订阅并获取最新快照，不重放历史事件。当前使用单后端进程的内存订阅，不支持跨实例事件总线或持久消息。
+- 已提交事件异步合并，慢连接有发送时间与缓冲上限。位置停止上报后按既有 `driver-location.freshness-seconds` 从内存快照补发 `stale=true`，过期检查不读表。未调整表、索引、初始化 SQL、计费或原位置关联逻辑。
+- 部署代理须支持 `/api/realtime` WebSocket Upgrade，空闲超时大于 75 秒；HTTPS 管理页使用 WSS。预约派单仍是后端业务调度，不属于客户端轮询。

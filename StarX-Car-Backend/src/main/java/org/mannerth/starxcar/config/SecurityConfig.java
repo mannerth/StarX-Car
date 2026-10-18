@@ -51,7 +51,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/auth/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/error")
+                        .requestMatchers("/api/realtime", "/api/auth/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/error")
                         .permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(traceIdFilter, HeaderWriterFilter.class)

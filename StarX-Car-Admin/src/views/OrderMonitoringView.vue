@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useOrderRealtime } from '@/api/realtime'
 import { useRouter } from 'vue-router'
 import { fetchOrderMetrics, fetchOrders } from '@/api/orders'
 import { useAuthStore } from '@/stores/auth'
@@ -10,14 +11,11 @@ const auth = useAuthStore(); const router = useRouter()
 const keyword = ref(''); const orderType = ref<OrderType | ''>(''); const status = ref<OrderStatus | ''>('')
 const page = ref(1); const size = 20; const total = ref(0); const records = ref<AdminOrderSummary[]>([]); const metrics = ref<AdminOrderMetrics | null>(null)
 const loading = ref(false); const error = ref(''); const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size)))
-let timer: number | undefined
 function format(value: string | null) { return value ? value.replace('T', ' ') : '—' }
 async function load() { loading.value = true; error.value = ''; try { const [orders, summary] = await Promise.all([fetchOrders({ page: page.value, size, keyword: keyword.value.trim() || undefined, orderType: orderType.value || undefined, status: status.value || undefined }), fetchOrderMetrics()]); records.value = orders.records; total.value = orders.total; page.value = orders.page; metrics.value = summary } catch (reason) { error.value = reason instanceof Error ? reason.message : '加载订单失败。' } finally { loading.value = false } }
 function search() { page.value = 1; void load() }
 function open(orderNo: string) { void router.push({ name: 'order-detail', params: { orderNo } }) }
-function visible() { if (!document.hidden) void load() }
-onMounted(() => { void load(); timer = window.setInterval(() => { if (!document.hidden) void load() }, 30000); document.addEventListener('visibilitychange', visible) })
-onUnmounted(() => { if (timer) window.clearInterval(timer); document.removeEventListener('visibilitychange', visible) })
+useOrderRealtime(load)
 </script>
 
 <template>

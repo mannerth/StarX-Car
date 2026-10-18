@@ -8,6 +8,34 @@ import 'package:starx_car_common/starx_car_common.dart';
 
 void main() {
   group('ApiClient', () {
+    test(
+      'transport token refresh rejection clears session and reports expiry',
+      () async {
+        final store = _MemorySessionStore(
+          _session('old-access', 'expired-refresh'),
+        );
+        final client = _client(
+          store,
+          (_) => _jsonResponse(401, {
+            'code': 401,
+            'message': 'refresh expired',
+            'data': null,
+          }),
+        );
+        await expectLater(
+          client.accessToken(refresh: true),
+          throwsA(
+            isA<ApiException>().having(
+              (error) => error.statusCode,
+              'statusCode',
+              401,
+            ),
+          ),
+        );
+        expect(store.current, isNull);
+        expect(store.clears, 1);
+      },
+    );
     test('adds Bearer token and unwraps a successful response', () async {
       final store = _MemorySessionStore(_session('old-access', 'old-refresh'));
       late final RequestOptions request;
